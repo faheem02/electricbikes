@@ -24,7 +24,7 @@ require_once '../includes/sidebar.php';
 <div class="content">
     <div class="topbar">
         <div><button class="sidebar-toggle" onclick="toggleSidebar()"><i class="bi bi-list"></i></button><span class="page-title">Product Details</span></div>
-        <div class="user-info"><i class="bi bi-person-circle"></i> <?php echo $_SESSION['full_name']; ?></div>
+        <div class="user-info"><i class="bi bi-person-circle"></i> <?php echo $_SESSION['full_name'] ?? ''; ?></div>
     </div>
     <div class="main-content">
         <div class="row g-3 mb-3">

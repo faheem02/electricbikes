@@ -18,26 +18,43 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save'])) {
     $downPay = floatval($_POST['down_payment']);
     $totalAmt = floatval($_POST['grand_total']);
     $remaining = max(0, $totalAmt - $discount - $downPay);
+    if ($type === 'cash' && $downPay == 0 && $remaining > 0) {
+        $downPay = $totalAmt - $discount;
+        $remaining = 0;
+    }
     $payStatus = ($remaining <= 0) ? 'paid' : ($downPay > 0 ? 'partial' : 'unpaid');
 
     $pdo->prepare("INSERT INTO sales (invoice_no, customer_id, sale_date, sale_type, total_amount, discount, down_payment, remaining_amount, payment_status, created_at) VALUES (?,?,?,?,?,?,?,?,?,CURDATE())")->execute([$inv, $cid, $date, $type, $totalAmt, $discount, $downPay, $remaining, $payStatus]);
     $sid = $pdo->lastInsertId();
 
     $stockStatus = $type === 'booking' ? 'booked' : 'sold';
+    $bikeNames = [];
     if (!empty($_POST['stock_id'])) {
         $saleItemStmt = $pdo->prepare("INSERT INTO sale_items (sale_id, stock_id, sale_price) VALUES (?,?,?)");
         $updateStk = $pdo->prepare("UPDATE bike_stock SET status=?, sale_id=? WHERE id=?");
+        $bikeNameStmt = $pdo->prepare("SELECT CONCAT(b.name, ' ', m.name, ' ', v.name) as bike_name, s.chassis_no FROM bike_stock s JOIN bike_variants v ON s.variant_id=v.id JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id WHERE s.id=?");
         foreach ($_POST['stock_id'] as $i => $stkId) {
             if (empty($stkId)) continue;
             $price = floatval($_POST['sale_price'][$i] ?? 0);
             $saleItemStmt->execute([$sid, $stkId, $price]);
             $updateStk->execute([$stockStatus, $sid, $stkId]);
+            $bikeNameStmt->execute([$stkId]);
+            $b = $bikeNameStmt->fetch(PDO::FETCH_ASSOC);
+            if ($b) $bikeNames[] = $b['bike_name'] . ' (' . $b['chassis_no'] . ')';
         }
     }
+    $bikeDetail = !empty($bikeNames) ? ' - ' . implode(', ', $bikeNames) : '';
 
-    $pdo->prepare("INSERT INTO customer_ledger (customer_id, date, description, debit, credit, balance) VALUES (?,?,'Sale - INV $inv',0,?,?)")->execute([$cid, $date, $totalAmt, $totalAmt]);
+    $pdo->prepare("INSERT INTO customer_ledger (customer_id, date, description, debit, credit, balance) VALUES (?,?,'Sale INV $inv$bikeDetail',?,0,0)")->execute([$cid, $date, $totalAmt]);
     if ($downPay > 0) {
-        $pdo->prepare("INSERT INTO customer_ledger (customer_id, date, description, debit, credit, balance) VALUES (?,?,'Down Payment - INV $inv',?,0,?)")->execute([$cid, $date, $downPay, $totalAmt - $downPay]);
+        $pdo->prepare("INSERT INTO customer_ledger (customer_id, date, description, debit, credit, balance) VALUES (?,?,'Payment INV $inv$bikeDetail',0,?,0)")->execute([$cid, $date, $downPay]);
+    }
+    $paymentMethod = $_POST['payment_method'] ?? '';
+    $paidAmount = $downPay > 0 ? $downPay : ($remaining <= 0 ? $totalAmt - $discount : 0);
+    if ($paidAmount > 0 && $paymentMethod === 'cash') {
+        $pdo->prepare("INSERT INTO cash_book (date, description, type, amount, balance) VALUES (?,?,'in',?,0)")->execute([$date, "Sale Payment INV $inv$bikeDetail", $paidAmount]);
+    } elseif ($paidAmount > 0 && $paymentMethod === 'bank') {
+        $pdo->prepare("INSERT INTO bank_book (date, description, type, amount, balance) VALUES (?,?,'in',?,0)")->execute([$date, "Sale Payment INV $inv$bikeDetail", $paidAmount]);
     }
 
     logActivity($pdo, 'Sale', "Invoice: $inv, Type: $type, Amount: $totalAmt");
@@ -145,7 +162,7 @@ require_once '../includes/sidebar.php';
 <div class="content">
     <div class="topbar">
         <div><button class="sidebar-toggle" onclick="toggleSidebar()"><i class="bi bi-list"></i></button><span class="page-title">New Sale</span></div>
-        <div class="user-info"><i class="bi bi-person-circle"></i> <?php echo $_SESSION['full_name']; ?> <button class="btn btn-sm btn-outline-secondary" onclick="toggleTheme()"><i class="bi bi-moon-fill"></i></button></div>
+        <div class="user-info"><i class="bi bi-person-circle"></i> <?php echo $_SESSION['full_name'] ?? ''; ?> <button class="btn btn-sm btn-outline-secondary" onclick="toggleTheme()"><i class="bi bi-moon-fill"></i></button></div>
     </div>
     <div class="main-content">
         <form method="POST" id="saleForm">
@@ -238,7 +255,7 @@ require_once '../includes/sidebar.php';
                         </div>
                         <div class="col-md-3" id="downPayDiv">
                             <div class="p-3 rounded-3" style="background:#f8f9fa;">
-                                <div class="small text-muted text-uppercase fw-semibold mb-1">Down Payment</div>
+                                <div class="small text-muted text-uppercase fw-semibold mb-1">Amount Paid</div>
                                 <input type="number" step="0.01" name="down_payment" class="form-control form-control-lg" placeholder="Enter amount" oninput="calcSummary()" style="font-size:1.2rem;font-weight:700;border:none;background:transparent;padding-left:0;">
                             </div>
                         </div>
@@ -252,6 +269,18 @@ require_once '../includes/sidebar.php';
                             <div class="p-3 rounded-3" id="statusBadge" style="background:#d4edda;">
                                 <div class="small text-uppercase fw-semibold mb-1">Status</div>
                                 <div class="fs-4 fw-bold" id="displayStatus">PAID</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-3">
+                            <div class="p-2 rounded-3" style="background:#f8f9fa;">
+                                <div class="small text-muted text-uppercase fw-semibold mb-1">Payment Method</div>
+                                <select name="payment_method" class="form-select form-select-sm" style="border:none;background:transparent;padding-left:0;">
+                                    <option value="">None</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="bank">Bank</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -271,6 +300,9 @@ function calcTotal() {
     $('.salePrice').each(function() { total += parseFloat($(this).val()) || 0; });
     $('#grand_total').val(total.toFixed(2));
     $('#displayTotal').text(total.toFixed(0));
+    if ($('#saleType').val() === 'cash') {
+        $('input[name="down_payment"]').val(total);
+    }
     calcSummary();
 }
 function calcSummary() {
@@ -293,7 +325,11 @@ $(document).on('change', 'select[name="stock_id[]"]', function() {
 });
 function toggleInstallment() {
     var type = $('#saleType').val();
-    if (type === 'cash') { $('#downPayDiv').hide(); $('input[name="down_payment"]').val(0); calcSummary(); } else { $('#downPayDiv').show(); }
+    if (type === 'cash') {
+        var total = parseFloat($('#grand_total').val()) || 0;
+        $('input[name="down_payment"]').val(total);
+        calcSummary();
+    }
 }
 function addRow() {
     var tbody = document.querySelector('#itemsTable tbody');

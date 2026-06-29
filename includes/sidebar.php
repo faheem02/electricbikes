@@ -12,15 +12,6 @@ $cs = function($names) use ($current) { return in_array($current, (array)$names)
         <a class="nav-link <?php echo $cp('index.php'); ?>" href="<?php echo $base_path; ?>index.php">
             <i class="bi bi-speedometer2"></i> Dashboard
         </a>
-
-        <a class="nav-link <?php echo $cg(['users.php','activity_logs.php']); ?>" href="#systemSub" data-bs-toggle="collapse">
-            <i class="bi bi-gear"></i> System <i class="bi bi-chevron-down ms-auto"></i>
-        </a>
-        <div class="collapse sub-menu <?php echo $cs(['users.php','activity_logs.php']); ?>" id="systemSub">
-            <a class="nav-link <?php echo $cp('users.php'); ?>" href="<?php echo $base_path; ?>pages/users.php">Users</a>
-            <a class="nav-link <?php echo $cp('activity_logs.php'); ?>" href="<?php echo $base_path; ?>pages/activity_logs.php">Activity Logs</a>
-        </div>
-
         <a class="nav-link <?php echo $cg(['customers.php','customer_ledger.php']); ?>" href="#customersSub" data-bs-toggle="collapse">
             <i class="bi bi-people"></i> Customers <i class="bi bi-chevron-down ms-auto"></i>
         </a>
@@ -83,12 +74,16 @@ $cs = function($names) use ($current) { return in_array($current, (array)$names)
             <i class="bi bi-receipt"></i> Expenses
         </a>
 
-        <a class="nav-link <?php echo $cp('reports.php'); ?>" href="<?php echo $base_path; ?>pages/reports.php">
-            <i class="bi bi-file-earmark-bar-graph"></i> Reports
+        <a class="nav-link <?php echo $cp('cash_book.php'); ?>" href="<?php echo $base_path; ?>pages/cash_book.php">
+            <i class="bi bi-cash"></i> Cash Book
         </a>
 
-        <a class="nav-link <?php echo $cp('settings.php'); ?>" href="<?php echo $base_path; ?>pages/settings.php">
-            <i class="bi bi-sliders"></i> Settings
+        <a class="nav-link <?php echo $cp('bank_book.php'); ?>" href="<?php echo $base_path; ?>pages/bank_book.php">
+            <i class="bi bi-bank"></i> Bank Book
+        </a>
+
+        <a class="nav-link <?php echo $cp('reports.php'); ?>" href="<?php echo $base_path; ?>pages/reports.php">
+            <i class="bi bi-file-earmark-bar-graph"></i> Reports
         </a>
 
         <hr class="m-0 text-white opacity-25">

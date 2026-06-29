@@ -35,7 +35,7 @@ require_once 'includes/sidebar.php';
             <span class="page-title">Dashboard</span>
         </div>
         <div class="user-info">
-            <i class="bi bi-person-circle"></i> <?php echo $_SESSION['full_name']; ?>
+            <i class="bi bi-person-circle"></i> <?php echo $_SESSION['full_name'] ?? ''; ?>
             <span class="badge bg-primary"><?php echo $_SESSION['role_name'] ?? ''; ?></span>
             <button class="btn btn-sm btn-outline-secondary" onclick="toggleTheme()" title="Toggle Theme"><i class="bi bi-moon-fill"></i></button>
         </div>

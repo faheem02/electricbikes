@@ -190,6 +190,15 @@ $tables = [
         balance DECIMAL(12,2) DEFAULT 0.00
     )",
 
+    "CREATE TABLE IF NOT EXISTS bank_book (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        date DATE,
+        description VARCHAR(255),
+        type ENUM('in','out') DEFAULT 'in',
+        amount DECIMAL(12,2) DEFAULT 0.00,
+        balance DECIMAL(12,2) DEFAULT 0.00
+    )",
+
     "CREATE TABLE IF NOT EXISTS activity_logs (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT,
@@ -286,6 +295,7 @@ $colAdd('installments', 'monthly_amount', 'DECIMAL(12,2) DEFAULT 0.00');
 $colAdd('installments', 'duration', 'INT DEFAULT 0');
 $colAdd('installments', 'start_date', 'DATE');
 $colAdd('installments', 'status', "VARCHAR(20) DEFAULT 'active'");
+$colAdd('purchase_items', 'variant_id', 'INT AFTER purchase_id');
 $colAdd('installments', 'down_payment', 'DECIMAL(12,2) DEFAULT 0.00');
 $colAdd('installment_payments', 'penalty', 'DECIMAL(12,2) DEFAULT 0.00');
 $colAdd('installment_payments', 'notes', 'TEXT');
