@@ -10,11 +10,10 @@ $todaySales = $pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE
 $monthSales = $pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE MONTH(sale_date) = MONTH(CURDATE()) AND YEAR(sale_date) = YEAR(CURDATE())")->fetchColumn();
 $bikesInStock = $pdo->query("SELECT COUNT(*) FROM bike_stock WHERE status = 'in_stock'")->fetchColumn();
 $totalCustomers = $pdo->query("SELECT COUNT(*) FROM customers")->fetchColumn();
-$totalSuppliers = $pdo->query("SELECT COUNT(*) FROM suppliers")->fetchColumn();
 
-// Chart data - last 12 months sales
+// Chart data - last 6 months sales (simplified from 12)
 $chartLabels = []; $chartData = [];
-for ($i = 11; $i >= 0; $i--) {
+for ($i = 5; $i >= 0; $i--) {
     $m = date('Y-m', strtotime("-$i months"));
     $chartLabels[] = date('M Y', strtotime("-$i months"));
     $stmt = $pdo->prepare("SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE DATE_FORMAT(sale_date, '%Y-%m') = ?");
@@ -40,8 +39,9 @@ require_once 'includes/sidebar.php';
         </div>
     </div>
     <div class="main-content">
+
         <div class="row g-3 mb-4">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="stat-card" style="background: linear-gradient(135deg, #A04657, #7f3544);">
                     <div class="d-flex justify-content-between">
                         <div><div class="number"><?php echo formatMoney($todaySales); ?></div><div class="label">Today's Sales</div></div>
@@ -49,7 +49,7 @@ require_once 'includes/sidebar.php';
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="stat-card" style="background: linear-gradient(135deg, #4e73df, #224abe);">
                     <div class="d-flex justify-content-between">
                         <div><div class="number"><?php echo formatMoney($monthSales); ?></div><div class="label">Monthly Sales</div></div>
@@ -57,7 +57,7 @@ require_once 'includes/sidebar.php';
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="stat-card" style="background: linear-gradient(135deg, #1cc88a, #13855c);">
                     <div class="d-flex justify-content-between">
                         <div><div class="number"><?php echo $bikesInStock; ?></div><div class="label">Bikes in Stock</div></div>
@@ -65,7 +65,7 @@ require_once 'includes/sidebar.php';
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="stat-card" style="background: linear-gradient(135deg, #36b9cc, #258391);">
                     <div class="d-flex justify-content-between">
                         <div><div class="number"><?php echo $totalCustomers; ?></div><div class="label">Total Customers</div></div>
@@ -73,39 +73,26 @@ require_once 'includes/sidebar.php';
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="stat-card" style="background: linear-gradient(135deg, #6f42c1, #553098);">
-                    <div class="d-flex justify-content-between">
-                        <div><div class="number"><?php echo $totalSuppliers; ?></div><div class="label">Suppliers</div></div>
-                        <i class="bi bi-truck"></i>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <div class="row g-3">
-            <div class="col-md-8">
+            <div class="col-12">
                 <div class="card">
-                    <div class="card-header"><i class="bi bi-bar-chart-line me-2"></i>Monthly Sales Trend</div>
+                    <div class="card-header"><i class="bi bi-bar-chart-line me-2"></i>Sales Trend (Last 6 Months)</div>
                     <div class="card-body">
-                        <canvas id="salesChart" height="280"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header"><i class="bi bi-pie-chart me-2"></i>Sales by Type</div>
-                    <div class="card-body">
-                        <canvas id="typeChart" height="240"></canvas>
+                        <canvas id="salesChart" height="90"></canvas>
                     </div>
                 </div>
             </div>
         </div>
 
         <div class="row g-3 mt-2">
-            <div class="col-md-6">
+            <div class="col-12">
                 <div class="card">
-                    <div class="card-header">Recent Sales</div>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-clock-history me-2"></i>Recent Sales</span>
+                        <a href="pages/sale_list.php" class="btn btn-sm btn-outline-primary">View All</a>
+                    </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-hover mb-0">
@@ -129,8 +116,8 @@ require_once 'includes/sidebar.php';
                     </div>
                 </div>
             </div>
-
         </div>
+
     </div>
 
 <script>
@@ -155,27 +142,6 @@ new Chart(ctx1, {
             y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
             x: { grid: { display: false } }
         }
-    }
-});
-
-<?php
-$cashSales = $pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE sale_type='cash'")->fetchColumn();
-$bookSales = $pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE sale_type='booking'")->fetchColumn();
-?>
-const ctx2 = document.getElementById('typeChart').getContext('2d');
-new Chart(ctx2, {
-    type: 'doughnut',
-    data: {
-        labels: ['Cash', 'Booking'],
-        datasets: [{
-            data: [<?php echo "$cashSales, $bookSales"; ?>],
-            backgroundColor: ['#1cc88a', '#f6c23e', '#36b9cc'],
-            borderWidth: 0
-        }]
-    },
-    options: {
-        responsive: true,
-        plugins: { legend: { position: 'bottom' } }
     }
 });
 </script>

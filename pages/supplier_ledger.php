@@ -152,7 +152,7 @@ require_once '../includes/sidebar.php';
             <span class="user-info"><i class="bi bi-person-circle"></i> <?php echo $_SESSION['full_name'] ?? ''; ?></span>
         </div>
     </div>
-    <div class="main-content p-0" style="flex:1;display:flex;flex-direction:column;">
+    <div class="main-content" style="flex:1;display:flex;flex-direction:column;">
         <div class="supp-ledger-filter">
             <form method="GET" class="row g-2 align-items-end">
                 <div class="col-md-4">
@@ -267,4 +267,6 @@ require_once '../includes/sidebar.php';
         </div>
     </div>
 </div>
+</div> <!-- close .content -->
+<style>.footer{padding-left:25px;padding-right:25px}</style>
 <?php require_once '../includes/footer.php'; ?>
