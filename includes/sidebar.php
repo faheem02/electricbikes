@@ -28,14 +28,6 @@ $cs = function($names) use ($current) { return in_array($current, (array)$names)
             <a class="nav-link <?php echo $cp('supplier_ledger.php'); ?>" href="<?php echo $base_path; ?>pages/supplier_ledger.php">Supplier Ledger</a>
         </div>
 
-        <a class="nav-link <?php echo $cg(['products.php','product_add.php','product_view.php','product_edit.php']); ?>" href="#productsSub" data-bs-toggle="collapse">
-            <i class="bi bi-box"></i> Products <i class="bi bi-chevron-down ms-auto"></i>
-        </a>
-        <div class="collapse sub-menu <?php echo $cs(['products.php','product_add.php','product_view.php','product_edit.php']); ?>" id="productsSub">
-            <a class="nav-link <?php echo $cp('products.php'); ?>" href="<?php echo $base_path; ?>pages/products.php">All Products</a>
-            <a class="nav-link <?php echo $cp('product_add.php'); ?>" href="<?php echo $base_path; ?>pages/product_add.php">Add Product</a>
-        </div>
-
         <a class="nav-link <?php echo $cg(['bike_brands.php','bike_models.php']); ?>" href="#bikesSub" data-bs-toggle="collapse">
             <i class="bi bi-bicycle"></i> Bikes <i class="bi bi-chevron-down ms-auto"></i>
         </a>
@@ -53,13 +45,12 @@ $cs = function($names) use ($current) { return in_array($current, (array)$names)
             <a class="nav-link <?php echo $cp('stock_ledger.php'); ?>" href="<?php echo $base_path; ?>pages/stock_ledger.php">Stock Ledger</a>
         </div>
 
-        <a class="nav-link <?php echo $cg(['purchases.php','purchase_view.php','receive_stock.php']); ?>" href="#purchasesSub" data-bs-toggle="collapse">
+        <a class="nav-link <?php echo $cg(['purchases.php','purchase_view.php']); ?>" href="#purchasesSub" data-bs-toggle="collapse">
             <i class="bi bi-cart-plus"></i> Purchases <i class="bi bi-chevron-down ms-auto"></i>
         </a>
-        <div class="collapse sub-menu <?php echo $cs(['purchases.php','purchase_view.php','receive_stock.php']); ?>" id="purchasesSub">
+        <div class="collapse sub-menu <?php echo $cs(['purchases.php','purchase_view.php']); ?>" id="purchasesSub">
             <a class="nav-link <?php echo $cp('purchases.php'); ?>" href="<?php echo $base_path; ?>pages/purchases.php">New Purchase</a>
             <a class="nav-link <?php echo $cp('purchase_view.php'); ?>" href="<?php echo $base_path; ?>pages/purchase_view.php">Purchase View</a>
-            <a class="nav-link <?php echo $cp('receive_stock.php'); ?>" href="<?php echo $base_path; ?>pages/receive_stock.php">Receive Stock</a>
         </div>
 
         <a class="nav-link <?php echo $cg(['sales.php','sale_list.php']); ?>" href="#salesSub" data-bs-toggle="collapse">

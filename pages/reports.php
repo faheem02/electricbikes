@@ -26,11 +26,6 @@ switch ($type) {
         $title = 'Stock Report';
         $result = $pdo->query("SELECT v.name as variant, m.name as model, b.name as brand, v.color, v.purchase_price, v.sale_price, (SELECT COUNT(*) FROM bike_stock WHERE variant_id=v.id AND status='in_stock') as in_stock, (SELECT COUNT(*) FROM bike_stock WHERE variant_id=v.id AND status='sold') as sold FROM bike_variants v JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id ORDER BY b.name, m.name, v.name");
         break;
-    case 'installment':
-        $title = 'Installment Report';
-        $result = $pdo->prepare("SELECT ip.*, c.name as cname, s.invoice_no FROM installment_payments ip JOIN customers c ON ip.customer_id=c.id JOIN installments i ON ip.installment_id=i.id JOIN sales s ON i.sale_id=s.id WHERE ip.due_date BETWEEN ? AND ? ORDER BY ip.due_date");
-        $result->execute([$from, $to]);
-        break;
     case 'expense':
         $title = 'Expense Report';
         $result = $pdo->prepare("SELECT category, SUM(amount) as total, COUNT(*) as count FROM expenses WHERE date BETWEEN ? AND ? GROUP BY category ORDER BY total DESC");
@@ -68,7 +63,6 @@ require_once '../includes/sidebar.php';
                             <option value="daily_sales" <?php echo $type=='daily_sales'?'selected':''; ?>>Daily Sales</option>
                             <option value="purchase" <?php echo $type=='purchase'?'selected':''; ?>>Purchase</option>
                             <option value="stock" <?php echo $type=='stock'?'selected':''; ?>>Stock</option>
-                            <option value="installment" <?php echo $type=='installment'?'selected':''; ?>>Installment</option>
                             <option value="expense" <?php echo $type=='expense'?'selected':''; ?>>Expense</option>
                             <option value="profit" <?php echo $type=='profit'?'selected':''; ?>>Profit & Loss</option>
                         </select>

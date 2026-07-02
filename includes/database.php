@@ -87,7 +87,7 @@ $tables = [
         motor_no VARCHAR(50) UNIQUE,
         battery_serial VARCHAR(50) UNIQUE,
         charger_serial VARCHAR(50) UNIQUE,
-        status ENUM('in_stock','sold','booked','damaged') DEFAULT 'in_stock',
+        status ENUM('ordered','in_stock','sold','booked','damaged') DEFAULT 'in_stock',
         purchase_id INT,
         sale_id INT,
         created_at DATE,
@@ -145,32 +145,6 @@ $tables = [
         FOREIGN KEY (stock_id) REFERENCES bike_stock(id) ON DELETE CASCADE
     )",
 
-    "CREATE TABLE IF NOT EXISTS installments (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        sale_id INT,
-        total_amount DECIMAL(12,2) DEFAULT 0.00,
-        down_payment DECIMAL(12,2) DEFAULT 0.00,
-        monthly_amount DECIMAL(12,2) DEFAULT 0.00,
-        duration INT DEFAULT 0,
-        start_date DATE,
-        status ENUM('active','completed','defaulted') DEFAULT 'active',
-        FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
-    )",
-
-    "CREATE TABLE IF NOT EXISTS installment_payments (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        installment_id INT,
-        customer_id INT,
-        amount DECIMAL(12,2) DEFAULT 0.00,
-        payment_date DATE,
-        due_date DATE,
-        penalty DECIMAL(12,2) DEFAULT 0.00,
-        notes TEXT,
-        status ENUM('paid','pending','overdue') DEFAULT 'pending',
-        FOREIGN KEY (installment_id) REFERENCES installments(id) ON DELETE CASCADE,
-        FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
-    )",
-
     "CREATE TABLE IF NOT EXISTS expenses (
         id INT AUTO_INCREMENT PRIMARY KEY,
         category VARCHAR(50),
@@ -207,16 +181,6 @@ $tables = [
         ip_address VARCHAR(45),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )",
-
-    "CREATE TABLE IF NOT EXISTS products (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        model VARCHAR(100),
-        brand VARCHAR(100),
-        price DECIMAL(12,2) DEFAULT 0.00,
-        stock INT DEFAULT 0,
-        created_at DATE
     )",
 
     "CREATE TABLE IF NOT EXISTS settings (
@@ -266,6 +230,7 @@ $colAdd('users', 'phone', 'VARCHAR(20) AFTER full_name');
 $colAdd('users', 'role_id', 'INT AFTER phone');
 $colAdd('users', 'status', "VARCHAR(20) DEFAULT 'active' AFTER role_id");
 $colAdd('users', 'last_login', 'DATETIME AFTER status');
+$colAdd('users', 'created_at', 'DATE AFTER last_login');
 $colAdd('customers', 'father_name', 'VARCHAR(100) AFTER name');
 $colAdd('customers', 'cnic', 'VARCHAR(15) AFTER father_name');
 $colAdd('customers', 'mobile', 'VARCHAR(20) AFTER cnic');
@@ -291,15 +256,9 @@ $colAdd('sales', 'down_payment', 'DECIMAL(12,2) DEFAULT 0.00');
 $colAdd('sales', 'remaining_amount', 'DECIMAL(12,2) DEFAULT 0.00');
 $colAdd('sales', 'payment_status', "VARCHAR(20) DEFAULT 'unpaid'");
 $colAdd('sales', 'notes', 'TEXT');
-$colAdd('installments', 'monthly_amount', 'DECIMAL(12,2) DEFAULT 0.00');
-$colAdd('installments', 'duration', 'INT DEFAULT 0');
-$colAdd('installments', 'start_date', 'DATE');
-$colAdd('installments', 'status', "VARCHAR(20) DEFAULT 'active'");
 $colAdd('purchase_items', 'variant_id', 'INT AFTER purchase_id');
-$colAdd('installments', 'down_payment', 'DECIMAL(12,2) DEFAULT 0.00');
-$colAdd('installment_payments', 'penalty', 'DECIMAL(12,2) DEFAULT 0.00');
-$colAdd('installment_payments', 'notes', 'TEXT');
-$colAdd('installment_payments', 'status', "VARCHAR(20) DEFAULT 'pending'");
+$colAdd('purchase_items', 'cost_price', 'DECIMAL(12,2) DEFAULT 0.00 AFTER qty');
+$colAdd('purchase_items', 'total', 'DECIMAL(12,2) DEFAULT 0.00 AFTER cost_price');
 $colAdd('expenses', 'paid_by', 'VARCHAR(100) AFTER date');
 
 // Add unique indexes (skip if duplicates exist)
@@ -310,9 +269,14 @@ $idxAdd = function($table, $index, $column) use ($pdo, $dbname) {
         try { $pdo->exec("ALTER TABLE `$table` ADD UNIQUE INDEX `$index` (`$column`)"); } catch (PDOException $e) {}
     }
 };
+// Fix bike_stock ENUM to include 'ordered' status
+try { $pdo->exec("ALTER TABLE bike_stock MODIFY COLUMN status ENUM('ordered','in_stock','sold','booked','damaged') DEFAULT 'in_stock'"); } catch (PDOException $e) {}
 $idxAdd('bike_stock', 'idx_motor_no', 'motor_no');
 $idxAdd('bike_stock', 'idx_battery_serial', 'battery_serial');
 $idxAdd('bike_stock', 'idx_charger_serial', 'charger_serial');
+
+// Drop products table (legacy — replaced by bike_stock)
+try { $pdo->exec("DROP TABLE IF EXISTS products"); } catch (PDOException $e) {}
 
 // Default roles
 $stmt = $pdo->query("SELECT COUNT(*) FROM roles");

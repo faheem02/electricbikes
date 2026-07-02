@@ -10,7 +10,6 @@ $todaySales = $pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE
 $monthSales = $pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE MONTH(sale_date) = MONTH(CURDATE()) AND YEAR(sale_date) = YEAR(CURDATE())")->fetchColumn();
 $bikesInStock = $pdo->query("SELECT COUNT(*) FROM bike_stock WHERE status = 'in_stock'")->fetchColumn();
 $totalCustomers = $pdo->query("SELECT COUNT(*) FROM customers")->fetchColumn();
-$pendingInstallments = $pdo->query("SELECT COALESCE(SUM(remaining_amount),0) FROM sales WHERE sale_type='installment' AND payment_status != 'paid'")->fetchColumn();
 $totalSuppliers = $pdo->query("SELECT COUNT(*) FROM suppliers")->fetchColumn();
 
 // Chart data - last 12 months sales
@@ -42,7 +41,7 @@ require_once 'includes/sidebar.php';
     </div>
     <div class="main-content">
         <div class="row g-3 mb-4">
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="stat-card" style="background: linear-gradient(135deg, #A04657, #7f3544);">
                     <div class="d-flex justify-content-between">
                         <div><div class="number"><?php echo formatMoney($todaySales); ?></div><div class="label">Today's Sales</div></div>
@@ -50,7 +49,7 @@ require_once 'includes/sidebar.php';
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="stat-card" style="background: linear-gradient(135deg, #4e73df, #224abe);">
                     <div class="d-flex justify-content-between">
                         <div><div class="number"><?php echo formatMoney($monthSales); ?></div><div class="label">Monthly Sales</div></div>
@@ -58,7 +57,7 @@ require_once 'includes/sidebar.php';
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="stat-card" style="background: linear-gradient(135deg, #1cc88a, #13855c);">
                     <div class="d-flex justify-content-between">
                         <div><div class="number"><?php echo $bikesInStock; ?></div><div class="label">Bikes in Stock</div></div>
@@ -66,15 +65,7 @@ require_once 'includes/sidebar.php';
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="stat-card" style="background: linear-gradient(135deg, #f6c23e, #dda20a);">
-                    <div class="d-flex justify-content-between">
-                        <div><div class="number"><?php echo formatMoney($pendingInstallments); ?></div><div class="label">Pending Installments</div></div>
-                        <i class="bi bi-coin"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="stat-card" style="background: linear-gradient(135deg, #36b9cc, #258391);">
                     <div class="d-flex justify-content-between">
                         <div><div class="number"><?php echo $totalCustomers; ?></div><div class="label">Total Customers</div></div>
@@ -82,7 +73,7 @@ require_once 'includes/sidebar.php';
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="stat-card" style="background: linear-gradient(135deg, #6f42c1, #553098);">
                     <div class="d-flex justify-content-between">
                         <div><div class="number"><?php echo $totalSuppliers; ?></div><div class="label">Suppliers</div></div>
@@ -128,7 +119,7 @@ require_once 'includes/sidebar.php';
                                         <td><?php echo e($r['invoice_no']); ?></td>
                                         <td><?php echo e($r['cname']); ?></td>
                                         <td><?php echo formatDate($r['sale_date']); ?></td>
-                                        <td><span class="badge bg-<?php echo $r['sale_type']=='cash'?'success':($r['sale_type']=='installment'?'warning text-dark':'info'); ?>"><?php echo ucfirst($r['sale_type']); ?></span></td>
+                                        <td><span class="badge bg-<?php echo $r['sale_type']=='cash'?'success':'info'; ?>"><?php echo ucfirst($r['sale_type']); ?></span></td>
                                         <td><?php echo formatMoney($r['total_amount']); ?></td>
                                     </tr>
                                 <?php endwhile; ?>
@@ -138,31 +129,7 @@ require_once 'includes/sidebar.php';
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">Due Installments</div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead><tr><th>Customer</th><th>Amount</th><th>Due Date</th><th>Status</th></tr></thead>
-                                <tbody>
-                                <?php
-                                $rp = $pdo->query("SELECT ip.*, c.name as cname FROM installment_payments ip JOIN customers c ON ip.customer_id=c.id WHERE ip.status='pending' ORDER BY ip.due_date ASC LIMIT 5");
-                                while ($r = $rp->fetch(PDO::FETCH_ASSOC)):
-                                ?>
-                                    <tr>
-                                        <td><?php echo e($r['cname']); ?></td>
-                                        <td><?php echo formatMoney($r['amount']); ?></td>
-                                        <td><?php echo formatDate($r['due_date']); ?></td>
-                                        <td><span class="badge bg-warning text-dark">Pending</span></td>
-                                    </tr>
-                                <?php endwhile; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
         </div>
     </div>
 
@@ -193,16 +160,15 @@ new Chart(ctx1, {
 
 <?php
 $cashSales = $pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE sale_type='cash'")->fetchColumn();
-$instSales = $pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE sale_type='installment'")->fetchColumn();
 $bookSales = $pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE sale_type='booking'")->fetchColumn();
 ?>
 const ctx2 = document.getElementById('typeChart').getContext('2d');
 new Chart(ctx2, {
     type: 'doughnut',
     data: {
-        labels: ['Cash', 'Installment', 'Booking'],
+        labels: ['Cash', 'Booking'],
         datasets: [{
-            data: [<?php echo "$cashSales, $instSales, $bookSales"; ?>],
+            data: [<?php echo "$cashSales, $bookSales"; ?>],
             backgroundColor: ['#1cc88a', '#f6c23e', '#36b9cc'],
             borderWidth: 0
         }]

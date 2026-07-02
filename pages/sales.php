@@ -297,39 +297,41 @@ require_once '../includes/sidebar.php';
 <script>
 function calcTotal() {
     var total = 0;
-    $('.salePrice').each(function() { total += parseFloat($(this).val()) || 0; });
-    $('#grand_total').val(total.toFixed(2));
-    $('#displayTotal').text(total.toFixed(0));
-    if ($('#saleType').val() === 'cash') {
-        $('input[name="down_payment"]').val(total);
-    }
+    document.querySelectorAll('.salePrice').forEach(function(el) { total += parseFloat(el.value) || 0; });
+    document.getElementById('grand_total').value = total.toFixed(2);
+    document.getElementById('displayTotal').textContent = total.toFixed(0);
     calcSummary();
 }
 function calcSummary() {
-    var total = parseFloat($('#grand_total').val()) || 0;
-    var discount = parseFloat($('input[name="discount"]').val()) || 0;
-    var downPay = parseFloat($('input[name="down_payment"]').val()) || 0;
+    var total = parseFloat(document.getElementById('grand_total').value) || 0;
+    var discount = parseFloat(document.querySelector('input[name="discount"]').value) || 0;
+    var downPay = parseFloat(document.querySelector('input[name="down_payment"]').value) || 0;
     var remaining = Math.max(0, total - discount - downPay);
-    $('#displayRemaining').text(remaining.toFixed(0));
+    document.getElementById('displayRemaining').textContent = remaining.toFixed(0);
     var status = remaining <= 0 ? 'PAID' : (downPay > 0 ? 'PARTIAL' : 'UNPAID');
-    $('#displayStatus').text(status);
-    var badge = $('#statusBadge');
-    if (status === 'PAID') { badge.css('background', '#d4edda').css('color', '#155724'); }
-    else if (status === 'PARTIAL') { badge.css('background', '#fff3cd').css('color', '#856404'); }
-    else { badge.css('background', '#f8d7da').css('color', '#721c24'); }
+    document.getElementById('displayStatus').textContent = status;
+    var badge = document.getElementById('statusBadge');
+    if (status === 'PAID') { badge.style.background = '#d4edda'; badge.style.color = '#155724'; }
+    else if (status === 'PARTIAL') { badge.style.background = '#fff3cd'; badge.style.color = '#856404'; }
+    else { badge.style.background = '#f8d7da'; badge.style.color = '#721c24'; }
 }
-$(document).on('change', 'select[name="stock_id[]"]', function() {
-    var price = $(this).find(':selected').data('price') || 0;
-    $(this).closest('tr').find('.salePrice').val(price);
-    calcTotal();
+document.getElementById('itemsTable').addEventListener('change', function(e) {
+    if (e.target.matches('select[name="stock_id[]"]')) {
+        var opt = e.target.options[e.target.selectedIndex];
+        var price = parseFloat(opt.getAttribute('data-price')) || 0;
+        e.target.closest('tr').querySelector('.salePrice').value = price;
+        calcTotal();
+    }
 });
 function toggleInstallment() {
-    var type = $('#saleType').val();
+    var type = document.getElementById('saleType').value;
     if (type === 'cash') {
-        var total = parseFloat($('#grand_total').val()) || 0;
-        $('input[name="down_payment"]').val(total);
-        calcSummary();
+        var total = parseFloat(document.getElementById('grand_total').value) || 0;
+        document.querySelector('input[name="down_payment"]').value = total;
+    } else {
+        document.querySelector('input[name="down_payment"]').value = 0;
     }
+    calcSummary();
 }
 function addRow() {
     var tbody = document.querySelector('#itemsTable tbody');

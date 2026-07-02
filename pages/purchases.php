@@ -12,42 +12,83 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save'])) {
     $date = $_POST['purchase_date'];
     $expenses = floatval($_POST['expenses']);
     $paid = floatval($_POST['paid_amount']);
-    $payStatus = $_POST['payment_status'];
 
     $total = 0;
     $items = [];
     if (!empty($_POST['variant_id'])) {
         foreach ($_POST['variant_id'] as $i => $vid) {
             if (empty($vid)) continue;
-            $qty = intval($_POST['qty'][$i] ?? 1);
-            $cost = floatval($_POST['cost_price'][$i] ?? 0);
-            if ($qty < 1 || $cost <= 0) continue;
-            $items[] = [$vid, $qty, $cost, $qty * $cost];
-            $total += $qty * $cost;
+            $chassis = $_POST['chassis_no'][$i] ?? '';
+            $motor = $_POST['motor_no'][$i] ?? '';
+            $battery = $_POST['battery_serial'][$i] ?? '';
+            $charger = $_POST['charger_serial'][$i] ?? '';
+            $pPrice = floatval($_POST['purchase_price'][$i] ?? 0);
+            $sPrice = floatval($_POST['sale_price'][$i] ?? 0);
+            if ($pPrice <= 0) continue;
+            $items[] = [$vid, $chassis, $motor, $battery, $charger, $pPrice, $sPrice];
+            $total += $pPrice;
         }
     }
 
     if (empty($items)) {
-        $err = 'Add at least one item with valid qty and cost price.';
+        $err = 'Add at least one bike with valid purchase price.';
     } else {
-        $pdo->prepare("INSERT INTO purchases (supplier_id, invoice_no, purchase_date, total_amount, expenses, paid_amount, payment_status, status, created_at) VALUES (?,?,?,?,?,?,?,'ordered',CURDATE())")->execute([$sid, $inv, $date, $total, $expenses, $paid, $payStatus]);
-        $pid = $pdo->lastInsertId();
+        try {
+            $pdo->beginTransaction();
+            $pdo->prepare("INSERT INTO purchases (supplier_id, invoice_no, purchase_date, total_amount, expenses, paid_amount, payment_status, status, created_at) VALUES (?,?,?,?,?,?,'unpaid','ordered',CURDATE())")->execute([$sid, $inv, $date, $total, $expenses, $paid]);
+            $pid = $pdo->lastInsertId();
 
-        $ins = $pdo->prepare("INSERT INTO purchase_items (purchase_id, variant_id, qty, cost_price, total) VALUES (?,?,?,?,?)");
-        foreach ($items as $it) {
-            $ins->execute([$pid, $it[0], $it[1], $it[2], $it[3]]);
+            $insItem = $pdo->prepare("INSERT INTO purchase_items (purchase_id, variant_id, qty, cost_price, total) VALUES (?,?,1,?,?)");
+            $insStock = $pdo->prepare("INSERT INTO bike_stock (variant_id, chassis_no, motor_no, battery_serial, charger_serial, purchase_price, sale_price, status, purchase_id, created_at) VALUES (?,?,?,?,?,?,?,'ordered',?,CURDATE())");
+            foreach ($items as $it) {
+                $insItem->execute([$pid, $it[0], $it[5], $it[5]]);
+                $insStock->execute([$it[0], $it[1] ?: null, $it[2] ?: null, $it[3] ?: null, $it[4] ?: null, $it[5], $it[6], $pid]);
+            }
+
+            $pdo->prepare("INSERT INTO supplier_ledger (supplier_id, date, description, debit, credit, balance) VALUES (?,?,'Purchase Order - INV $inv',0,?,?)")->execute([$sid, $date, $total, $total]);
+
+        if ($paid > 0) {
+            $method = $_POST['payment_method'] ?? '';
+            $payDesc = "Payment against Purchase INV $inv";
+            $stmt = $pdo->prepare("INSERT INTO supplier_ledger (supplier_id, date, description, debit, credit, balance) VALUES (?,?,?,?,?,0)");
+            $stmt->execute([$sid, $date, "Payment - Purchase INV $inv", $paid, 0]);
+            if ($method === 'cash') {
+                $stmt2 = $pdo->prepare("INSERT INTO cash_book (date, description, type, amount, balance) VALUES (?,?,'out',?,0)");
+                $stmt2->execute([$date, $payDesc, $paid]);
+            } elseif ($method === 'bank') {
+                $stmt2 = $pdo->prepare("INSERT INTO bank_book (date, description, type, amount, balance) VALUES (?,?,'out',?,0)");
+                $stmt2->execute([$date, $payDesc, $paid]);
+            }
         }
 
-        $pdo->prepare("INSERT INTO supplier_ledger (supplier_id, date, description, debit, credit, balance) VALUES (?,?,'Purchase Order - INV $inv',0,?,?)")->execute([$sid, $date, $total, $total]);
-        logActivity($pdo, 'Purchase Order', "Invoice: $inv, Amount: $total");
+        if ($expenses > 0) {
+            $expMethod = $_POST['payment_method'] ?? '';
+            $expDesc = "Purchase Expense - INV $inv";
+            $pdo->prepare("INSERT INTO expenses (category, amount, description, date, paid_by) VALUES (?,?,?,?,?)")->execute(["Purchase Expense", $expenses, $expDesc, $date, $_SESSION['full_name'] ?? '']);
+            if ($expMethod === 'cash') {
+                $pdo->prepare("INSERT INTO cash_book (date, description, type, amount, balance) VALUES (?,'Purchase Expense INV $inv','out',?,0)")->execute([$date, $expenses]);
+            } elseif ($expMethod === 'bank') {
+                $pdo->prepare("INSERT INTO bank_book (date, description, type, amount, balance) VALUES (?,'Purchase Expense INV $inv','out',?,0)")->execute([$date, $expenses]);
+            }
+        }
+
+        $pdo->commit();
+        logActivity($pdo, 'Purchase Order', "Invoice: $inv, Amount: $total, Items: " . count($items));
         header('Location: purchase_view.php'); exit;
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        if ($e->getCode() == 23000) {
+            $err = 'Duplicate entry! Chassis, Motor, Battery, and Charger numbers must be unique.';
+        } else {
+            throw $e;
+        }
+    }
     }
 }
 
 if (isset($_GET['delete'])) {
     $id = $_GET['delete'];
-    $stk = $pdo->prepare("UPDATE bike_stock SET status='in_stock', sale_id=NULL WHERE purchase_id=?");
-    $stk->execute([$id]);
+    $pdo->prepare("DELETE FROM bike_stock WHERE purchase_id=?")->execute([$id]);
     $pdo->prepare("DELETE FROM purchases WHERE id=?")->execute([$id]);
     $loc = ($_GET['redirect'] ?? '') === 'view' ? 'purchase_view.php' : 'purchases.php';
     header("Location: $loc"); exit;
@@ -61,7 +102,9 @@ require_once '../includes/sidebar.php';
 <div class="content">
     <div class="topbar">
         <div><button class="sidebar-toggle" onclick="toggleSidebar()"><i class="bi bi-list"></i></button><span class="page-title">New Purchase Order</span></div>
-        <div class="user-info"><i class="bi bi-person-circle"></i> <?php echo $_SESSION['full_name'] ?? ''; ?> <button class="btn btn-sm btn-outline-secondary" onclick="toggleTheme()"><i class="bi bi-moon-fill"></i></button></div>
+        <span class="user-info">
+            <i class="bi bi-person-circle"></i> <?php echo $_SESSION['full_name'] ?? ''; ?> <button class="btn btn-sm btn-outline-secondary" onclick="toggleTheme()"><i class="bi bi-moon-fill"></i></button>
+        </span>
     </div>
     <div class="main-content">
         <?php if (!empty($err)): ?>
@@ -69,8 +112,8 @@ require_once '../includes/sidebar.php';
         <?php endif; ?>
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-truck me-2"></i>Purchase Order</span>
-                <span class="text-muted small">Order bikes from supplier — stock will be received later</span>
+                <span><i class="bi bi-truck me-2"></i>Purchase Order — Enter Bike Details</span>
+                <span class="text-muted small">Serials will auto-create bike stock in ordered status</span>
             </div>
             <div class="card-body">
                 <form method="POST" id="orderForm">
@@ -84,29 +127,39 @@ require_once '../includes/sidebar.php';
                                 <?php endwhile; ?>
                             </select>
                         </div>
-                        <div class="col-md-2"><input type="text" name="invoice_no" class="form-control" placeholder="Invoice No" required></div>
-                        <div class="col-md-2"><input type="date" name="purchase_date" class="form-control" value="<?php echo date('Y-m-d'); ?>"></div>
-                        <div class="col-md-2"><input type="number" step="0.01" name="expenses" class="form-control" placeholder="Expenses"></div>
-                        <div class="col-md-2"><input type="number" step="0.01" name="paid_amount" class="form-control" placeholder="Paid Amount"></div>
-                        <div class="col-md-1">
-                            <select name="payment_status" class="form-select">
-                                <option value="unpaid">Unpaid</option>
-                                <option value="partial">Partial</option>
-                                <option value="paid">Paid</option>
+                        <div class="col-md-3"><input type="text" name="invoice_no" class="form-control" placeholder="Invoice No" required></div>
+                        <div class="col-md-3"><input type="date" name="purchase_date" class="form-control" value="<?php echo date('Y-m-d'); ?>"></div>
+                        <div class="col-md-3"><input type="number" step="0.01" name="expenses" class="form-control" placeholder="Expenses"></div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <div class="input-group">
+                                <span class="input-group-text">Paid Amount</span>
+                                <input type="number" step="0.01" name="paid_amount" class="form-control" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <select name="payment_method" class="form-select">
+                                <option value="">Payment Method</option>
+                                <option value="cash">Cash</option>
+                                <option value="bank">Bank</option>
                             </select>
                         </div>
                     </div>
                     <div class="table-responsive mb-3">
                         <table class="table table-bordered table-hover mb-2" id="itemsTable">
                             <thead class="table-primary">
-                <tr>
-                    <th>#</th>
-                    <th style="min-width:160px;">Variant</th>
-                    <th style="width:100px;">Qty</th>
-                    <th style="width:130px;">Cost Price</th>
-                    <th style="width:130px;">Total</th>
-                    <th style="width:50px;"></th>
-                </tr>
+                                <tr>
+                                    <th>#</th>
+                                    <th style="min-width:160px;">Variant</th>
+                                    <th style="width:120px;">Chassis No</th>
+                                    <th style="width:110px;">Motor No</th>
+                                    <th style="width:110px;">Battery Serial</th>
+                                    <th style="width:110px;">Charger Serial</th>
+                                    <th style="width:110px;">Purchase Price</th>
+                                    <th style="width:100px;">Sale Price</th>
+                                    <th style="width:40px;"></th>
+                                </tr>
                             </thead>
                             <tbody>
                                 <tr>
@@ -115,66 +168,59 @@ require_once '../includes/sidebar.php';
                                         <select name="variant_id[]" class="form-select form-select-sm variant-select" required>
                                             <option value="">Select Variant</option>
                                             <?php $variants->execute(); while ($v = $variants->fetch(PDO::FETCH_ASSOC)): ?>
-                                                <option value="<?php echo $v['id']; ?>" data-price="<?php echo $v['purchase_price']; ?>"><?php echo e($v['bname'] . ' ' . $v['mname'] . ' - ' . $v['name']); ?></option>
+                                                <option value="<?php echo $v['id']; ?>" data-purchase="<?php echo $v['purchase_price']; ?>" data-sale="<?php echo $v['sale_price']; ?>"><?php echo e($v['bname'] . ' ' . $v['mname'] . ' - ' . $v['name']); ?></option>
                                             <?php endwhile; ?>
                                         </select>
                                     </td>
-                                    <td><input type="number" name="qty[]" class="form-control form-control-sm qty-input" min="1" value="1" required></td>
-                                    <td><input type="number" step="0.01" name="cost_price[]" class="form-control form-control-sm cost-input" min="0" required placeholder="Cost"></td>
-                                    <td class="row-total fw-semibold">0.00</td>
+                                    <td><input type="text" name="chassis_no[]" class="form-control form-control-sm" placeholder="Chassis"></td>
+                                    <td><input type="text" name="motor_no[]" class="form-control form-control-sm" placeholder="Motor"></td>
+                                    <td><input type="text" name="battery_serial[]" class="form-control form-control-sm" placeholder="Battery"></td>
+                                    <td><input type="text" name="charger_serial[]" class="form-control form-control-sm" placeholder="Charger"></td>
+                                    <td><input type="number" step="0.01" name="purchase_price[]" class="form-control form-control-sm purchase-input" min="0" step="0.01" required placeholder="0"></td>
+                                    <td><input type="number" step="0.01" name="sale_price[]" class="form-control form-control-sm" step="0.01" placeholder="0"></td>
                                     <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-x"></i></button></td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                     <div class="d-flex gap-2 mb-3">
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow()"><i class="bi bi-plus-lg"></i> Add Row</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow()"><i class="bi bi-plus-lg"></i> Add Bike</button>
                         <button type="submit" name="save" class="btn btn-primary"><i class="bi bi-save"></i> Save Purchase Order</button>
                     </div>
                     <div class="text-end">
-                        <strong>Order Total: <span id="orderTotal">0.00</span></strong>
+                        <strong>Total Purchase: <span id="orderTotal">0.00</span></strong>
                     </div>
                 </form>
             </div>
         </div>
         <div class="mt-3">
             <a href="purchase_view.php" class="btn btn-outline-secondary"><i class="bi bi-clock-history"></i> View Purchase History</a>
-            <a href="receive_stock.php" class="btn btn-outline-success"><i class="bi bi-box-seam"></i> Receive Stock</a>
         </div>
     </div>
 <script>
-function calcRow(row) {
-    var qty = parseFloat(row.querySelector('.qty-input').value) || 0;
-    var cost = parseFloat(row.querySelector('.cost-input').value) || 0;
-    var total = qty * cost;
-    row.querySelector('.row-total').textContent = total.toFixed(2);
-    calcTotal();
-}
 function calcTotal() {
     var total = 0;
-    document.querySelectorAll('#itemsTable tbody tr').forEach(function(r) {
-        total += parseFloat(r.querySelector('.row-total').textContent) || 0;
+    document.querySelectorAll('#itemsTable tbody .purchase-input').forEach(function(el) {
+        total += parseFloat(el.value) || 0;
     });
     document.getElementById('orderTotal').textContent = total.toFixed(2);
 }
 document.querySelector('#itemsTable tbody').addEventListener('input', function(e) {
-    if (e.target.classList.contains('qty-input') || e.target.classList.contains('cost-input')) {
-        calcRow(e.target.closest('tr'));
-    }
+    if (e.target.classList.contains('purchase-input')) calcTotal();
 });
 document.querySelector('#itemsTable tbody').addEventListener('change', function(e) {
     if (e.target.classList.contains('variant-select')) {
-        var price = e.target.options[e.target.selectedIndex].getAttribute('data-price') || 0;
+        var opt = e.target.options[e.target.selectedIndex];
         var row = e.target.closest('tr');
-        row.querySelector('.cost-input').value = price;
-        calcRow(row);
+        row.querySelector('.purchase-input').value = opt.getAttribute('data-purchase') || 0;
+        row.querySelector('input[name="sale_price[]"]').value = opt.getAttribute('data-sale') || 0;
+        calcTotal();
     }
 });
 function addRow() {
     var tbody = document.querySelector('#itemsTable tbody');
     var row = tbody.querySelector('tr').cloneNode(true);
-    row.querySelectorAll('input, select').forEach(function(e) { if (e.tagName !== 'SELECT') e.value = ''; });
-    row.querySelector('.row-total').textContent = '0.00';
+    row.querySelectorAll('input').forEach(function(e) { e.value = ''; });
     tbody.appendChild(row);
     renumber();
 }
