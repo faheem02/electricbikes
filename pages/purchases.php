@@ -8,7 +8,8 @@ $suppliers = $pdo->query("SELECT * FROM suppliers ORDER BY name");
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save'])) {
     $sid = $_POST['supplier_id'];
-    $inv = $_POST['invoice_no'];
+    $inv = trim($_POST['invoice_no'] ?? '');
+    if ($inv === '') $inv = nextInvoiceNo($pdo, 'PUR-', 'purchases');
     $date = $_POST['purchase_date'];
     $expenses = floatval($_POST['expenses']);
     $paid = floatval($_POST['paid_amount']);
@@ -35,7 +36,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save'])) {
     } else {
         try {
             $pdo->beginTransaction();
-            $pdo->prepare("INSERT INTO purchases (supplier_id, invoice_no, purchase_date, total_amount, expenses, paid_amount, payment_status, status, created_at) VALUES (?,?,?,?,?,?,'unpaid','ordered',CURDATE())")->execute([$sid, $inv, $date, $total, $expenses, $paid]);
+            $grandTotal = $total + $expenses;
+            $payStatus = ($paid >= $grandTotal && $grandTotal > 0) ? 'paid' : ($paid > 0 ? 'partial' : 'unpaid');
+            $pdo->prepare("INSERT INTO purchases (supplier_id, invoice_no, purchase_date, total_amount, expenses, paid_amount, payment_status, status, created_at) VALUES (?,?,?,?,?,?,?,'ordered',CURDATE())")->execute([$sid, $inv, $date, $total, $expenses, $paid, $payStatus]);
             $pid = $pdo->lastInsertId();
 
             $insItem = $pdo->prepare("INSERT INTO purchase_items (purchase_id, variant_id, qty, cost_price, total) VALUES (?,?,1,?,?)");
@@ -95,6 +98,7 @@ if (isset($_GET['delete'])) {
 }
 
 $variants = $pdo->query("SELECT v.id, v.name, v.purchase_price, v.sale_price, m.name as mname, b.name as bname FROM bike_variants v JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id ORDER BY b.name, m.name, v.name");
+$purchaseInvNo = nextInvoiceNo($pdo, 'PUR-', 'purchases');
 
 require_once '../includes/header.php';
 require_once '../includes/sidebar.php';
@@ -127,7 +131,7 @@ require_once '../includes/sidebar.php';
                                 <?php endwhile; ?>
                             </select>
                         </div>
-                        <div class="col-md-3"><input type="text" name="invoice_no" class="form-control" placeholder="Invoice No" required></div>
+                        <div class="col-md-3"><input type="text" name="invoice_no" class="form-control" value="<?php echo e($purchaseInvNo); ?>" required></div>
                         <div class="col-md-3"><input type="date" name="purchase_date" class="form-control" value="<?php echo date('Y-m-d'); ?>"></div>
                         <div class="col-md-3"><input type="number" step="0.01" name="expenses" class="form-control" placeholder="Expenses"></div>
                     </div>

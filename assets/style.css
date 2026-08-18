@@ -1,7 +1,7 @@
 :root {
-    --primary: #A04657;
-    --primary-dark: #7f3544;
-    --primary-light: #c76a7b;
+    --primary: #095D3B;
+    --primary-dark: #06472B;
+    --primary-light: #2E9B6B;
     --sidebar-width: 260px;
     --bg-body: #f4f6f9;
     --bg-card: #ffffff;
@@ -45,6 +45,9 @@ body {
     font-weight: 700;
     text-align: center;
     border-bottom: 1px solid rgba(255,255,255,0.12);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 .sidebar .brand i { margin-right: 8px; }
 .sidebar .nav-link {
@@ -139,7 +142,7 @@ body {
 }
 .form-control:focus, .form-select:focus {
     border-color: var(--primary);
-    box-shadow: 0 0 0 0.15rem rgba(160,70,87,0.15);
+    box-shadow: 0 0 0 0.15rem rgba(9,93,59,0.15);
 }
 @media (max-width: 768px) {
     .sidebar { left: calc(-1 * var(--sidebar-width)); }

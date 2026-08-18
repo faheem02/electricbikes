@@ -59,6 +59,14 @@ require_once '../includes/sidebar.php';
                             <label class="form-label">Tax Rate (%)</label>
                             <input type="number" step="0.01" name="setting[tax_rate]" class="form-control" value="<?php echo e($settingsMap['tax_rate'] ?? '0'); ?>">
                         </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Invoice Warranty Text</label>
+                            <textarea name="setting[invoice_warranty]" class="form-control" rows="2"><?php echo e($settingsMap['invoice_warranty'] ?? ''); ?></textarea>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Invoice Terms & Notes</label>
+                            <textarea name="setting[invoice_terms]" class="form-control" rows="3"><?php echo e($settingsMap['invoice_terms'] ?? ''); ?></textarea>
+                        </div>
                         <div class="col-12">
                             <button type="submit" name="save" class="btn btn-primary"><i class="bi bi-save"></i> Save Settings</button>
                         </div>

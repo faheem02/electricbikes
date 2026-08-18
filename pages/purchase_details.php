@@ -4,10 +4,11 @@ require_once '../includes/auth.php';
 requireLogin();
 
 $id = $_GET['id'] ?? 0;
+if (!$id) { header('Location: purchase_view.php'); exit; }
 $p = $pdo->prepare("SELECT p.*, s.name as sname FROM purchases p LEFT JOIN suppliers s ON p.supplier_id=s.id WHERE p.id=?");
 $p->execute([$id]);
 $r = $p->fetch(PDO::FETCH_ASSOC);
-if (!$r) { echo '<div class="alert alert-danger">Purchase not found.</div>'; exit; }
+if (!$r) { header('Location: purchase_view.php'); exit; }
 ?>
 <h6 class="fw-semibold mb-2"><i class="bi bi-receipt me-1"></i>Purchase Order Details</h6>
 <table class="table table-sm table-borderless mb-3">

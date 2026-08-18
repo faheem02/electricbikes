@@ -1,6 +1,6 @@
 <?php
 $host = 'localhost';
-$dbname = 'electricbikes';
+$dbname = 'alhafiz_motor';
 $username = 'root';
 $password = '';
 
@@ -255,6 +255,7 @@ $colAdd('sales', 'discount', 'DECIMAL(12,2) DEFAULT 0.00');
 $colAdd('sales', 'down_payment', 'DECIMAL(12,2) DEFAULT 0.00');
 $colAdd('sales', 'remaining_amount', 'DECIMAL(12,2) DEFAULT 0.00');
 $colAdd('sales', 'payment_status', "VARCHAR(20) DEFAULT 'unpaid'");
+$colAdd('sales', 'payment_method', "VARCHAR(20) DEFAULT 'cash' AFTER payment_status");
 $colAdd('sales', 'notes', 'TEXT');
 $colAdd('purchase_items', 'variant_id', 'INT AFTER purchase_id');
 $colAdd('purchase_items', 'cost_price', 'DECIMAL(12,2) DEFAULT 0.00 AFTER qty');
@@ -301,6 +302,8 @@ $defaults = [
     ['currency', 'PKR'],
     ['invoice_prefix', 'INV-'],
     ['tax_rate', '0'],
+    ['invoice_warranty', "Warranty: 1 Year on battery, motor & charger. Warranty is void if serial numbers are tampered with or bike is serviced outside authorized center."],
+    ['invoice_terms', "Terms & Conditions:\n1. Sale is final, no refund after delivery.\n2. Bike should be serviced at authorized service center only.\n3. This invoice is required for any warranty claim."],
 ];
 $stmt = $pdo->prepare("SELECT COUNT(*) FROM settings WHERE `key` = ?");
 $ins = $pdo->prepare("INSERT IGNORE INTO settings (`key`, `value`) VALUES (?, ?)");

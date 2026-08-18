@@ -7,11 +7,13 @@ $showSidebar = true; $base_path = '../';
 $customers = $pdo->query("SELECT * FROM customers ORDER BY name");
 $stockItems = $pdo->query("SELECT s.id, s.chassis_no, s.motor_no, s.battery_serial, s.sale_price, s.purchase_price, v.name as vname, v.sale_price as variant_sale, v.purchase_price as variant_purchase, m.name as mname, b.name as bname FROM bike_stock s JOIN bike_variants v ON s.variant_id=v.id JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id WHERE s.status='in_stock' ORDER BY b.name, m.name");
 
-$invNo = 'INV-' . date('Ymd') . '-' . str_pad($pdo->query("SELECT COUNT(*)+1 FROM sales")->fetchColumn(), 3, '0', STR_PAD_LEFT);
+$invPrefix = getSetting($pdo, 'invoice_prefix') ?: 'INV-';
+$invNo = nextInvoiceNo($pdo, $invPrefix);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save'])) {
     $cid = $_POST['customer_id'];
-    $inv = $_POST['invoice_no'];
+    $inv = trim($_POST['invoice_no'] ?? '');
+    if ($inv === '') $inv = nextInvoiceNo($pdo, getSetting($pdo, 'invoice_prefix') ?: 'INV-');
     $date = $_POST['sale_date'];
     $type = $_POST['sale_type'];
     $discount = floatval($_POST['discount']);
@@ -23,8 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save'])) {
         $remaining = 0;
     }
     $payStatus = ($remaining <= 0) ? 'paid' : ($downPay > 0 ? 'partial' : 'unpaid');
+    $paymentMethod = $_POST['payment_method'] ?? 'cash';
 
-    $pdo->prepare("INSERT INTO sales (invoice_no, customer_id, sale_date, sale_type, total_amount, discount, down_payment, remaining_amount, payment_status, created_at) VALUES (?,?,?,?,?,?,?,?,?,CURDATE())")->execute([$inv, $cid, $date, $type, $totalAmt, $discount, $downPay, $remaining, $payStatus]);
+    $pdo->prepare("INSERT INTO sales (invoice_no, customer_id, sale_date, sale_type, total_amount, discount, down_payment, remaining_amount, payment_status, payment_method, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,CURDATE())")->execute([$inv, $cid, $date, $type, $totalAmt, $discount, $downPay, $remaining, $payStatus, $paymentMethod]);
     $sid = $pdo->lastInsertId();
 
     $stockStatus = $type === 'booking' ? 'booked' : 'sold';
@@ -49,7 +52,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save'])) {
     if ($downPay > 0) {
         $pdo->prepare("INSERT INTO customer_ledger (customer_id, date, description, debit, credit, balance) VALUES (?,?,'Payment INV $inv$bikeDetail',0,?,0)")->execute([$cid, $date, $downPay]);
     }
-    $paymentMethod = $_POST['payment_method'] ?? '';
     $paidAmount = $downPay > 0 ? $downPay : ($remaining <= 0 ? $totalAmt - $discount : 0);
     if ($paidAmount > 0 && $paymentMethod === 'cash') {
         $pdo->prepare("INSERT INTO cash_book (date, description, type, amount, balance) VALUES (?,?,'in',?,0)")->execute([$date, "Sale Payment INV $inv$bikeDetail", $paidAmount]);
@@ -73,83 +75,152 @@ if (isset($_GET['delete'])) {
 // Print invoice
 if (isset($_GET['print'])) {
     $sid = $_GET['print'];
-    $sale = $pdo->prepare("SELECT s.*, c.name as cname, c.mobile, c.address FROM sales s JOIN customers c ON s.customer_id=c.id WHERE s.id=?");
+    require_once __DIR__ . '/../includes/company.php';
+    $sale = $pdo->prepare("SELECT s.*, c.name as cname, c.father_name, c.cnic, c.mobile, c.address, c.city FROM sales s JOIN customers c ON s.customer_id=c.id WHERE s.id=?");
     $sale->execute([$sid]);
     $sale = $sale->fetch(PDO::FETCH_ASSOC);
     if ($sale) {
-        $items = $pdo->prepare("SELECT si.*, s.chassis_no, v.name as vname, m.name as mname, b.name as bname FROM sale_items si JOIN bike_stock s ON si.stock_id=s.id JOIN bike_variants v ON s.variant_id=v.id JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id WHERE si.sale_id=?");
+        $items = $pdo->prepare("SELECT si.*, s.chassis_no, s.motor_no, s.battery_serial, s.charger_serial, YEAR(s.created_at) as bike_year, v.name as vname, v.color, m.name as mname, b.name as bname FROM sale_items si JOIN bike_stock s ON si.stock_id=s.id JOIN bike_variants v ON s.variant_id=v.id JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id WHERE si.sale_id=?");
         $items->execute([$sid]);
         $netAmount = $sale['total_amount'] - $sale['discount'];
+        $warranty = getSetting($pdo, 'invoice_warranty');
+        $terms = getSetting($pdo, 'invoice_terms');
         ?>
         <!DOCTYPE html><html><head><title>Invoice <?php echo $sale['invoice_no']; ?></title>
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
         <style>
-            * { font-family: 'Poppins', sans-serif; margin: 0; padding: 0; box-sizing:border-box; }
-            body { padding: 40px; background:#f5f5f5; }
-            .invoice-box { max-width: 800px; margin: auto; background:#fff; border-radius:8px; padding: 40px; box-shadow:0 2px 10px rgba(0,0,0,.1); }
-            .header { text-align: center; border-bottom: 2px solid #A04657; padding-bottom: 20px; margin-bottom: 20px; }
-            .header h1 { color: #A04657; font-size: 26px; margin:0; }
-            .header p { color:#888; margin:5px 0 0; font-size:14px; }
-            .details { display: flex; justify-content: space-between; margin-bottom: 20px; font-size:14px; }
-            .details div { line-height:1.8; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size:14px; }
-            th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #ddd; }
-            th { background: #A04657; color: #fff; font-weight:600; }
-            .summary-table th { background: transparent; color:#333; border-bottom:1px solid #ddd; font-weight:500; }
-            .summary-table td { text-align:right; font-weight:600; }
-            .summary-table .total-row td { font-size:16px; font-weight:700; border-top:2px solid #A04657; }
-            .footer { text-align: center; margin-top: 30px; color: #888; font-size: 13px; border-top:1px solid #eee; padding-top:20px; }
-            .no-print { text-align:center; margin-top:20px; }
+            * { font-family: 'Poppins', sans-serif; margin:0; padding:0; box-sizing:border-box; }
+            body { background:#f0f0f0; padding:25px; }
+            .inv { max-width:640px; margin:auto; background:#fff; box-shadow:0 2px 12px rgba(0,0,0,.12); }
+            .inv-inner { padding:28px 32px; }
+            .brand { text-align:center; }
+            .brand h1 { color:#095D3B; font-size:30px; font-weight:700; letter-spacing:1px; margin:0; }
+            .brand .tagline { color:#095D3B; font-weight:600; font-size:11px; letter-spacing:3px; text-transform:uppercase; margin-top:3px; }
+            .brand .meta { color:#666; font-size:11px; margin-top:7px; line-height:1.6; }
+            .brand .meta .meta-line { margin:2px 0; }
+            .brand .meta .meta-line i { color:#095D3B; margin-right:5px; width:14px; text-align:center; }
+            .title-row { border-bottom:3px solid #095D3B; margin-top:14px; padding-bottom:7px; text-align:center; }
+            .title-row h2 { color:#095D3B; font-size:19px; font-weight:700; letter-spacing:5px; margin:0; text-transform:uppercase; }
+            .inv-meta { display:flex; justify-content:space-between; font-size:11px; margin-top:10px; color:#333; }
+            .inv-meta b { font-weight:600; color:#095D3B; }
+            .sec { margin-top:15px; }
+            .sec-bar { background:#095D3B; color:#fff; padding:5px 10px; font-size:10.5px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; }
+            .sec-body { border:1px solid #e4e4e4; border-top:none; padding:10px; }
+            .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:7px 18px; }
+            .grid2 .f span { color:#888; font-size:9px; text-transform:uppercase; letter-spacing:.5px; display:block; }
+            .grid2 .f { color:#222; font-size:12px; }
+            .full { grid-column:1 / -1; }
+            table.items { width:100%; border-collapse:collapse; }
+            table.items th, table.items td { padding:6px 7px; font-size:10.5px; text-align:left; border-bottom:1px solid #eee; }
+            table.items th { background:#095D3B; color:#fff; font-weight:600; font-size:10px; text-transform:uppercase; letter-spacing:.4px; }
+            .bike-name { font-weight:600; color:#095D3B; }
+            .sum .row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; font-size:12px; color:#333; }
+            .sum .row span:first-child { color:#666; }
+            .sum .net { border-top:2px solid #095D3B; font-weight:700; font-size:14px; margin-top:3px; padding-top:7px; }
+            .sum .net span:first-child { color:#095D3B; }
+            .sum .paid { color:#1d8a4e; font-weight:700; }
+            .sum .due { color:#d62839; font-weight:700; }
+            .pay-badge { display:inline-block; background:#e8f3ee; color:#095D3B; padding:2px 10px; border-radius:10px; font-size:10px; font-weight:600; text-transform:uppercase; }
+            .notes { font-size:10.5px; color:#444; line-height:1.7; white-space:pre-line; }
+            .notes b { color:#095D3B; }
+            .foot { background:#095D3B; color:#fff; text-align:center; padding:11px; font-size:11px; font-weight:600; letter-spacing:.5px; }
+            .no-print { text-align:center; margin-top:18px; }
             .no-print button, .no-print a { display:inline-block; padding:10px 24px; margin:0 5px; border-radius:4px; text-decoration:none; font-size:14px; cursor:pointer; border:none; }
-            .btn-primary { background:#A04657; color:#fff; }
+            .btn-primary { background:#095D3B; color:#fff; }
             .btn-secondary { background:#6c757d; color:#fff; }
-            @media print { body { padding:20px; background:#fff; } .invoice-box { box-shadow:none; padding:20px; } .no-print { display:none; } }
-            .text-end { text-align:right; }
-            .text-green { color:#28a745; font-weight:700; }
-            .text-red { color:#dc3545; font-weight:700; }
-            .text-muted { color:#888; }
+            @media print { body { padding:0; background:#fff; } .inv { box-shadow:none; } .no-print { display:none; } }
         </style>
         </head><body>
-        <div class="invoice-box">
-            <div class="header">
-                <h1>Electric Bikes Showroom</h1>
-                <p>Sale & Purchase Management</p>
-            </div>
-            <div class="details">
-                <div>
-                    <strong>Customer:</strong> <?php echo e($sale['cname']); ?><br>
-                    <strong>Mobile:</strong> <?php echo e($sale['mobile']); ?><br>
-                    <?php if ($sale['address']): ?><strong>Address:</strong> <?php echo e($sale['address']); ?><?php endif; ?>
+        <div class="inv">
+            <div class="inv-inner">
+                <div class="brand">
+                    <img src="../pic/alhafiz.jpeg" alt="Logo" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:10px;border:2px solid #095D3B;">
+                    <h1><?php echo COMPANY_NAME; ?></h1>
+                    <div class="tagline">EV Scooties &amp; Electric Motorcycles</div>
+                    <div class="meta">
+                        <div class="meta-line"><i class="fas fa-map-marker-alt"></i> <?php echo COMPANY_ADDRESS; ?></div>
+                        <div class="meta-line"><?php echo COMPANY_TAGLINE; ?> | <?php echo COMPANY_LINE3; ?></div>
+                        <div class="meta-line"><i class="fab fa-whatsapp"></i> <?php echo COMPANY_PHONES; ?></div>
+                        <div class="meta-line"><i class="fas fa-envelope"></i> <?php echo COMPANY_EMAIL; ?></div>
+                    </div>
                 </div>
-                <div style="text-align:right">
-                    <strong>Invoice:</strong> <?php echo $sale['invoice_no']; ?><br>
-                    <strong>Date:</strong> <?php echo formatDate($sale['sale_date']); ?><br>
-                    <strong>Type:</strong> <?php echo ucfirst($sale['sale_type']); ?>
+                <div class="title-row"><h2>Sales Invoice</h2></div>
+                <div class="inv-meta">
+                    <div><b>Invoice No:</b> <?php echo e($sale['invoice_no']); ?></div>
+                    <div><b>Date:</b> <?php echo formatDate($sale['sale_date']); ?></div>
+                </div>
+
+                <div class="sec">
+                    <div class="sec-bar">Customer Details</div>
+                    <div class="sec-body">
+                        <div class="grid2">
+                            <div class="f"><span>Customer Name</span><?php echo e($sale['cname']); ?></div>
+                            <div class="f"><span>Father / Husband Name</span><?php echo e($sale['father_name'] ?: '-'); ?></div>
+                            <div class="f"><span>CNIC No</span><?php echo e($sale['cnic'] ?: '-'); ?></div>
+                            <div class="f"><span>Contact No</span><?php echo e($sale['mobile'] ?: '-'); ?></div>
+                            <div class="f full"><span>Address</span><?php echo e(trim(($sale['address'] ?: '') . ($sale['city'] ? ', ' . $sale['city'] : ''), ', ') ?: '-'); ?></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sec">
+                    <div class="sec-bar">Vehicle / Bike Details</div>
+                    <div class="sec-body" style="padding:0;">
+                        <table class="items">
+                            <tr>
+                                <th>#</th><th>Bike</th><th>Chassis No</th><th>Motor No</th><th>Battery No</th><th>Charger No</th><th>Year</th><th class="text-end" style="text-align:right;">Price</th>
+                            </tr>
+                            <?php $hasItems = false; $i = 1; while ($it = $items->fetch(PDO::FETCH_ASSOC)): $hasItems = true; ?>
+                            <tr>
+                                <td><?php echo $i++; ?></td>
+                                <td class="bike-name"><?php echo e(trim($it['bname'] . ' ' . $it['mname'] . ' ' . $it['vname'] . ($it['color'] ? ' [' . $it['color'] . ']' : ''))); ?></td>
+                                <td><?php echo e($it['chassis_no'] ?: '-'); ?></td>
+                                <td><?php echo e($it['motor_no'] ?: '-'); ?></td>
+                                <td><?php echo e($it['battery_serial'] ?: '-'); ?></td>
+                                <td><?php echo e($it['charger_serial'] ?: '-'); ?></td>
+                                <td><?php echo e($it['bike_year'] ?: '-'); ?></td>
+                                <td class="text-end" style="text-align:right;"><?php echo formatMoney($it['sale_price']); ?></td>
+                            </tr>
+                            <?php endwhile; if (!$hasItems): ?>
+                            <tr><td colspan="8" style="text-align:center;color:#888;">No items</td></tr>
+                            <?php endif; ?>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="sec">
+                    <div class="sec-bar">Sale Details</div>
+                    <div class="sec-body">
+                        <div class="sum">
+                            <div class="row"><span>Subtotal</span><span><?php echo formatMoney($sale['total_amount']); ?></span></div>
+                            <?php if ($sale['discount'] > 0): ?>
+                            <div class="row"><span>Discount</span><span>-<?php echo formatMoney($sale['discount']); ?></span></div>
+                            <?php endif; ?>
+                            <div class="row net"><span>Net Amount</span><span><?php echo formatMoney($netAmount); ?></span></div>
+                            <div class="row"><span>Amount Paid</span><span class="paid"><?php echo formatMoney($sale['down_payment']); ?></span></div>
+                            <div class="row"><span>Balance Due</span><span class="<?php echo $sale['remaining_amount'] > 0 ? 'due' : 'paid'; ?>"><?php echo $sale['remaining_amount'] > 0 ? formatMoney($sale['remaining_amount']) : '0.00'; ?></span></div>
+                            <div class="row"><span>Payment Method</span><span><?php echo e(ucfirst($sale['payment_method'] ?: 'cash')); ?></span></div>
+                            <div class="row"><span>Payment Status</span><span class="pay-badge"><?php echo ucfirst($sale['payment_status']); ?></span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sec">
+                    <div class="sec-bar">Terms &amp; Notes</div>
+                    <div class="sec-body">
+                        <div class="notes">
+                            <?php if ($terms): ?><?php echo e($terms); ?><?php endif; ?>
+                            <?php if (!empty($sale['notes'])): ?><?php if ($terms): echo "\n\n"; endif; ?><b>Notes:</b> <?php echo e($sale['notes']); ?><?php endif; ?>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <table>
-                <tr><th>#</th><th>Bike</th><th>Chassis</th><th>Price</th></tr>
-                <?php $hasItems = false; $i=1; while ($it = $items->fetch(PDO::FETCH_ASSOC)): $hasItems = true; ?>
-                <tr><td><?php echo $i++; ?></td><td><?php echo e($it['bname'] . ' ' . $it['mname'] . ' ' . $it['vname']); ?></td><td><?php echo e($it['chassis_no']); ?></td><td><?php echo formatMoney($it['sale_price']); ?></td></tr>
-                <?php endwhile; if (!$hasItems): ?>
-                <tr><td colspan="4" class="text-muted" style="text-align:center;">No items</td></tr>
-                <?php endif; ?>
-            </table>
-            <table class="summary-table">
-                <tr><th style="width:75%;">Total Amount</th><td><?php echo formatMoney($sale['total_amount']); ?></td></tr>
-                <?php if ($sale['discount'] > 0): ?>
-                <tr><th>Discount</th><td>-<?php echo formatMoney($sale['discount']); ?></td></tr>
-                <?php endif; ?>
-                <tr class="total-row"><th>Net Amount</th><td><?php echo formatMoney($netAmount); ?></td></tr>
-                <tr><th>Amount Paid</th><td class="text-green"><?php echo formatMoney($sale['down_payment']); ?></td></tr>
-                <tr><th>Remaining</th><td class="<?php echo $sale['remaining_amount'] > 0 ? 'text-red' : 'text-green'; ?>"><?php echo $sale['remaining_amount'] > 0 ? formatMoney($sale['remaining_amount']) : '0.00'; ?></td></tr>
-                <tr><th>Status</th><td><?php echo ucfirst($sale['payment_status']); ?></td></tr>
-            </table>
-            <div class="footer">Thank you for your business!</div>
-            <div class="no-print">
-                <button onclick="window.print()" class="btn-primary">Print</button>
-                <a href="sale_list.php" class="btn-secondary">Close</a>
-            </div>
+            <div class="foot">Thank you for shopping with <?php echo COMPANY_NAME; ?></div>
+        </div>
+        <div class="no-print">
+            <button onclick="window.print()" class="btn-primary"><i class="bi bi-printer"></i> Print</button>
+            <a href="sale_list.php" class="btn-secondary">Close</a>
         </div>
         </body></html>
         <?php exit;
@@ -277,9 +348,10 @@ require_once '../includes/sidebar.php';
                             <div class="p-2 rounded-3" style="background:#f8f9fa;">
                                 <div class="small text-muted text-uppercase fw-semibold mb-1">Payment Method</div>
                                 <select name="payment_method" class="form-select form-select-sm" style="border:none;background:transparent;padding-left:0;">
-                                    <option value="">None</option>
                                     <option value="cash">Cash</option>
                                     <option value="bank">Bank</option>
+                                    <option value="online">Online</option>
+                                    <option value="other">Other</option>
                                 </select>
                             </div>
                         </div>

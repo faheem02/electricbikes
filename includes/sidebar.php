@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/company.php';
 $current = basename($_SERVER['PHP_SELF']);
 $cp = function($name) use ($current) { return $current === $name ? 'active' : ''; };
 $cg = function($names) use ($current) { return in_array($current, (array)$names) ? 'active' : ''; };
@@ -6,7 +7,8 @@ $cs = function($names) use ($current) { return in_array($current, (array)$names)
 ?>
 <div class="sidebar" id="sidebar">
     <div class="brand">
-        <i class="bi bi-bicycle"></i> Electric Bikes
+        <img src="<?php echo $base_path; ?>pic/alhafiz.jpeg" alt="Logo" style="width:60px;height:60px;border-radius:50%;object-fit:cover;margin-bottom:8px;border:2px solid rgba(255,255,255,0.3);">
+        <div><?php echo COMPANY_NAME; ?></div>
     </div>
     <nav class="nav flex-column mt-1">
         <a class="nav-link <?php echo $cp('index.php'); ?>" href="<?php echo $base_path; ?>index.php">
@@ -28,12 +30,13 @@ $cs = function($names) use ($current) { return in_array($current, (array)$names)
             <a class="nav-link <?php echo $cp('supplier_ledger.php'); ?>" href="<?php echo $base_path; ?>pages/supplier_ledger.php">Supplier Ledger</a>
         </div>
 
-        <a class="nav-link <?php echo $cg(['bike_brands.php','bike_models.php']); ?>" href="#bikesSub" data-bs-toggle="collapse">
+        <a class="nav-link <?php echo $cg(['bike_brands.php','bike_models.php','products.php']); ?>" href="#bikesSub" data-bs-toggle="collapse">
             <i class="bi bi-bicycle"></i> Bikes <i class="bi bi-chevron-down ms-auto"></i>
         </a>
-        <div class="collapse sub-menu <?php echo $cs(['bike_brands.php','bike_models.php']); ?>" id="bikesSub">
+        <div class="collapse sub-menu <?php echo $cs(['bike_brands.php','bike_models.php','products.php']); ?>" id="bikesSub">
             <a class="nav-link <?php echo $cp('bike_brands.php'); ?>" href="<?php echo $base_path; ?>pages/bike_brands.php">Brands</a>
             <a class="nav-link <?php echo $cp('bike_models.php'); ?>" href="<?php echo $base_path; ?>pages/bike_models.php">Models</a>
+            <a class="nav-link <?php echo $cp('products.php'); ?>" href="<?php echo $base_path; ?>pages/products.php">Products</a>
         </div>
 
         <a class="nav-link <?php echo $cg(['bike_stock.php','stock_entry.php','stock_ledger.php']); ?>" href="#stockSub" data-bs-toggle="collapse">

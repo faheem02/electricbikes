@@ -80,4 +80,21 @@ function StrLimit($str, $limit = 50) {
     if (mb_strlen($str) <= $limit) return $str;
     return mb_substr($str, 0, $limit) . '...';
 }
+
+function nextInvoiceNo($pdo, $prefix, $table = 'sales', $col = 'invoice_no') {
+    $date = date('Ymd');
+    $base = $prefix . $date . '-';
+    $stmt = $pdo->prepare("SELECT `$col` FROM `$table` WHERE `$col` LIKE ? ORDER BY `$col` DESC LIMIT 1");
+    $stmt->execute([$base . '%']);
+    $last = $stmt->fetchColumn();
+    $seq = $last ? intval(substr($last, strlen($base))) + 1 : 1;
+    $chk = $pdo->prepare("SELECT COUNT(*) FROM `$table` WHERE `$col` = ?");
+    while (true) {
+        $cand = $base . str_pad($seq, 3, '0', STR_PAD_LEFT);
+        $chk->execute([$cand]);
+        if ($chk->fetchColumn() == 0) break;
+        $seq++;
+    }
+    return $cand;
+}
 ?>

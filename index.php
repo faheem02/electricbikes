@@ -42,7 +42,7 @@ require_once 'includes/sidebar.php';
 
         <div class="row g-3 mb-4">
             <div class="col-md-3">
-                <div class="stat-card" style="background: linear-gradient(135deg, #A04657, #7f3544);">
+                <div class="stat-card" style="background: linear-gradient(135deg, #0e6b45, #095D3B);">
                     <div class="d-flex justify-content-between">
                         <div><div class="number"><?php echo formatMoney($todaySales); ?></div><div class="label">Today's Sales</div></div>
                         <i class="bi bi-cart-check"></i>
@@ -129,8 +129,8 @@ new Chart(ctx1, {
         datasets: [{
             label: 'Sales',
             data: <?php echo $chartDataJson; ?>,
-            backgroundColor: 'rgba(160,70,87,0.6)',
-            borderColor: '#A04657',
+            backgroundColor: 'rgba(9,93,59,0.6)',
+            borderColor: '#095D3B',
             borderWidth: 1,
             borderRadius: 4
         }]

@@ -41,13 +41,13 @@ if (isset($_GET['print'])) {
         * { font-family:'Poppins',sans-serif; margin:0; padding:0; box-sizing:border-box; }
         body { padding:40px; background:#f5f5f5; }
         .print-box { max-width:1100px; margin:auto; background:#fff; border-radius:8px; padding:40px; box-shadow:0 2px 10px rgba(0,0,0,.1); }
-        .header { text-align:center; border-bottom:2px solid #A04657; padding-bottom:20px; margin-bottom:20px; }
-        .header h1 { color:#A04657; font-size:24px; margin:0; }
+        .header { text-align:center; border-bottom:2px solid #095D3B; padding-bottom:20px; margin-bottom:20px; }
+        .header h1 { color:#095D3B; font-size:24px; margin:0; }
         .header p { color:#888; margin:5px 0 0; font-size:13px; }
         .info { text-align:right; margin-bottom:15px; font-size:13px; }
         table { width:100%; border-collapse:collapse; font-size:12px; }
         th, td { padding:6px 8px; text-align:left; border-bottom:1px solid #ddd; }
-        th { background:#A04657; color:#fff; font-weight:600; font-size:11px; text-transform:uppercase; }
+        th { background:#095D3B; color:#fff; font-weight:600; font-size:11px; text-transform:uppercase; }
         .text-end { text-align:right; }
         .text-muted { color:#888; }
         .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600; }
@@ -58,12 +58,12 @@ if (isset($_GET['print'])) {
         .footer { text-align:center; margin-top:30px; color:#888; font-size:13px; border-top:1px solid #eee; padding-top:20px; }
         .no-print { text-align:center; margin-top:20px; }
         .no-print button { display:inline-block; padding:10px 24px; margin:0 5px; border-radius:4px; font-size:14px; cursor:pointer; border:none; }
-        .btn-primary { background:#A04657; color:#fff; }
+        .btn-primary { background:#095D3B; color:#fff; }
         .btn-secondary { background:#6c757d; color:#fff; }
         @media print { body { padding:20px; background:#fff; } .print-box { box-shadow:none; padding:20px; } .no-print { display:none; } }
     </style></head><body>
     <div class="print-box">
-        <div class="header"><h1><?php echo e(getSetting($pdo, 'company_name') ?: 'Electric Bikes Showroom'); ?></h1><p>Sales List</p></div>
+        <?php $pt = 'Sales List'; include '../includes/print_header.php'; ?>
         <div class="info">Total Sales: <?php echo count($salesList); ?></div>
         <table>
             <tr><th>Invoice</th><th>Customer</th><th>Bikes</th><th>Date</th><th>Type</th><th class="text-end">Amount</th><th class="text-end">Paid</th><th class="text-end">Remaining</th><th>Status</th></tr>
@@ -131,6 +131,7 @@ require_once '../includes/sidebar.php';
 <td class="text-nowrap">
     <div class="d-flex gap-1">
         <a href="sales.php?print=<?php echo $r['id']; ?>" target="_blank" class="btn btn-sm btn-outline-info" title="Print Invoice"><i class="bi bi-printer"></i></a>
+        <a href="sales.php?edit=<?php echo $r['id']; ?>" class="btn btn-sm btn-outline-primary" title="Edit Sale"><i class="bi bi-pencil"></i></a>
         <?php if ($hasBooked): ?>
             <a href="sale_list.php?deliver=<?php echo $r['id']; ?>" class="btn btn-sm btn-success" onclick="return confirm('Mark this booking as delivered?')" title="Complete Delivery"><i class="bi bi-check-circle"></i></a>
         <?php endif; ?>

@@ -47,10 +47,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
-        :root { --primary: #A04657; --primary-dark: #7f3544; }
+        :root { --primary: #095D3B; --primary-dark: #06472B; }
         * { font-family: 'Poppins', sans-serif; margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background: linear-gradient(135deg, #A04657 0%, #7f3544 50%, #5a2530 100%);
+            background: linear-gradient(135deg, #0e6b45 0%, #095D3B 50%, #04301C 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .login-card .brand h2 { font-weight: 700; color: #333; margin-top: 10px; font-size: 22px; }
         .login-card .brand p { color: #888; font-size: 13px; margin: 0; }
         .form-control { border-radius: 8px; padding: 12px 15px; border: 1px solid #ddd; font-size: 14px; }
-        .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 0.2rem rgba(160,70,87,0.15); }
+        .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 0.2rem rgba(9,93,59,0.15); }
         .btn-login {
             background: var(--primary); border: none; border-radius: 8px; padding: 12px;
             font-weight: 600; font-size: 16px; color: #fff; width: 100%; cursor: pointer; transition: 0.3s;

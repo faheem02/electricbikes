@@ -38,15 +38,15 @@ if (isset($_GET['print']) && $supplier) {
         * { font-family: 'Poppins', sans-serif; margin:0; padding:0; box-sizing:border-box; }
         body { padding:40px; background:#f5f5f5; }
         .print-box { max-width:1000px; margin:auto; background:#fff; border-radius:8px; padding:40px; box-shadow:0 2px 10px rgba(0,0,0,.1); }
-        .header { text-align:center; border-bottom:2px solid #A04657; padding-bottom:20px; margin-bottom:20px; }
-        .header h1 { color:#A04657; font-size:24px; margin:0; }
+        .header { text-align:center; border-bottom:2px solid #095D3B; padding-bottom:20px; margin-bottom:20px; }
+        .header h1 { color:#095D3B; font-size:24px; margin:0; }
         .header p { color:#888; margin:5px 0 0; font-size:13px; }
         .info { display:flex; justify-content:space-between; margin-bottom:20px; font-size:14px; }
         .info div { line-height:1.8; }
         .info .label { color:#888; font-size:12px; text-transform:uppercase; letter-spacing:0.3px; }
         table { width:100%; border-collapse:collapse; font-size:13px; }
         th, td { padding:8px 12px; text-align:left; border-bottom:1px solid #ddd; }
-        th { background:#A04657; color:#fff; font-weight:600; font-size:12px; text-transform:uppercase; }
+        th { background:#095D3B; color:#fff; font-weight:600; font-size:12px; text-transform:uppercase; }
         .text-end { text-align:right; }
         .fw-bold { font-weight:700; }
         .text-success { color:#28a745; }
@@ -56,12 +56,12 @@ if (isset($_GET['print']) && $supplier) {
         .footer { text-align:center; margin-top:30px; color:#888; font-size:13px; border-top:1px solid #eee; padding-top:20px; }
         .no-print { text-align:center; margin-top:20px; }
         .no-print button { display:inline-block; padding:10px 24px; margin:0 5px; border-radius:4px; font-size:14px; cursor:pointer; border:none; }
-        .btn-primary { background:#A04657; color:#fff; }
+        .btn-primary { background:#095D3B; color:#fff; }
         .btn-secondary { background:#6c757d; color:#fff; }
         @media print { body { padding:20px; background:#fff; } .print-box { box-shadow:none; padding:20px; } .no-print { display:none; } }
     </style></head><body>
     <div class="print-box">
-        <div class="header"><h1><?php echo e(getSetting($pdo, 'company_name') ?: 'Electric Bikes Showroom'); ?></h1><p>Supplier Ledger</p></div>
+        <?php $pt = 'Supplier Ledger'; include '../includes/print_header.php'; ?>
         <div class="info">
             <div>
                 <strong><?php echo e($supplier['name']); ?></strong><br>
