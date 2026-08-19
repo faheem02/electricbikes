@@ -42,8 +42,8 @@
 
 ## Key business flow
 - **Stock status lifecycle**: `ordered` → `in_stock` → `sold` / `booked` / `damaged`
-- **Purchase**: creates `purchases` + `bike_stock` rows directly (each row = 1 bike with serials), status = `ordered`. Supplier ledger credited with total. No separate "receive stock" step needed for new purchases.
-- **Receive bikes**: On `purchase_view.php`, click **Receive** (per bike or Receive All) → `bike_stock.status` changes from `ordered` → `in_stock`. Purchase status auto-updates: `ordered` → `partial` → `completed`.
+- **Purchase**: creates `purchases` + `purchase_items` (with qty) + `bike_stock` rows (each row = 1 bike, serials are NULL). Purchase form: variant + qty + purchase_price + sale_price only (no serial numbers). Supplier ledger credited with total.
+- **Receive bikes**: On `purchase_view.php`, click **View Details** or **Receive** icon → opens modal with bike list. Click **Receive** per bike → modal opens to enter chassis_no (required), motor_no, battery_serial, charger_serial → POST updates bike_stock with serials + status `ordered` → `in_stock`. **Receive All** button → modal with serial inputs for all ordered bikes at once. Purchase status auto-updates: `ordered` → `partial` → `completed`. Duplicate serials caught as `PDOException 23000`.
 - **`receive_stock.php`** still exists for legacy purchases (pre-change) but is removed from sidebar.
 - **Direct stock entry** (`stock_entry.php`): two forms — Add Variant (creates `bike_variants` row) and Add Stock Unit (creates `bike_stock` with serials). Used for stock arriving without a purchase order. New stock gets status `in_stock`.
 - **`bike_stock` has `purchase_price` / `sale_price` columns** — can override variant-level prices per unit.

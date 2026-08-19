@@ -16,18 +16,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save'])) {
 
     $total = 0;
     $items = [];
+    $bikeCount = 0;
     if (!empty($_POST['variant_id'])) {
         foreach ($_POST['variant_id'] as $i => $vid) {
             if (empty($vid)) continue;
-            $chassis = $_POST['chassis_no'][$i] ?? '';
-            $motor = $_POST['motor_no'][$i] ?? '';
-            $battery = $_POST['battery_serial'][$i] ?? '';
-            $charger = $_POST['charger_serial'][$i] ?? '';
+            $qty = max(1, intval($_POST['qty'][$i] ?? 1));
             $pPrice = floatval($_POST['purchase_price'][$i] ?? 0);
             $sPrice = floatval($_POST['sale_price'][$i] ?? 0);
             if ($pPrice <= 0) continue;
-            $items[] = [$vid, $chassis, $motor, $battery, $charger, $pPrice, $sPrice];
-            $total += $pPrice;
+            $items[] = [$vid, $qty, $pPrice, $sPrice];
+            $total += $pPrice * $qty;
+            $bikeCount += $qty;
         }
     }
 
@@ -41,11 +40,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save'])) {
             $pdo->prepare("INSERT INTO purchases (supplier_id, invoice_no, purchase_date, total_amount, expenses, paid_amount, payment_status, status, created_at) VALUES (?,?,?,?,?,?,?,'ordered',CURDATE())")->execute([$sid, $inv, $date, $total, $expenses, $paid, $payStatus]);
             $pid = $pdo->lastInsertId();
 
-            $insItem = $pdo->prepare("INSERT INTO purchase_items (purchase_id, variant_id, qty, cost_price, total) VALUES (?,?,1,?,?)");
-            $insStock = $pdo->prepare("INSERT INTO bike_stock (variant_id, chassis_no, motor_no, battery_serial, charger_serial, purchase_price, sale_price, status, purchase_id, created_at) VALUES (?,?,?,?,?,?,?,'ordered',?,CURDATE())");
+            $insItem = $pdo->prepare("INSERT INTO purchase_items (purchase_id, variant_id, qty, cost_price, total) VALUES (?,?,?,?,?)");
+            $insStock = $pdo->prepare("INSERT INTO bike_stock (variant_id, chassis_no, motor_no, battery_serial, charger_serial, purchase_price, sale_price, status, purchase_id, created_at) VALUES (?,NULL,NULL,NULL,NULL,?,?,'ordered',?,CURDATE())");
             foreach ($items as $it) {
-                $insItem->execute([$pid, $it[0], $it[5], $it[5]]);
-                $insStock->execute([$it[0], $it[1] ?: null, $it[2] ?: null, $it[3] ?: null, $it[4] ?: null, $it[5], $it[6], $pid]);
+                $insItem->execute([$pid, $it[0], $it[1], $it[2], $it[2] * $it[1]]);
+                for ($q = 0; $q < $it[1]; $q++) {
+                    $insStock->execute([$it[0], $it[2], $it[3], $pid]);
+                }
             }
 
             $pdo->prepare("INSERT INTO supplier_ledger (supplier_id, date, description, debit, credit, balance) VALUES (?,?,'Purchase Order - INV $inv',0,?,?)")->execute([$sid, $date, $total, $total]);
@@ -76,15 +77,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save'])) {
         }
 
         $pdo->commit();
-        logActivity($pdo, 'Purchase Order', "Invoice: $inv, Amount: $total, Items: " . count($items));
+        logActivity($pdo, 'Purchase Order', "Invoice: $inv, Amount: $total, Bikes: $bikeCount");
         header('Location: purchase_view.php'); exit;
     } catch (PDOException $e) {
         $pdo->rollBack();
-        if ($e->getCode() == 23000) {
-            $err = 'Duplicate entry! Chassis, Motor, Battery, and Charger numbers must be unique.';
-        } else {
-            throw $e;
-        }
+        throw $e;
     }
     }
 }
@@ -117,7 +114,7 @@ require_once '../includes/sidebar.php';
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-truck me-2"></i>Purchase Order — Enter Bike Details</span>
-                <span class="text-muted small">Serials will auto-create bike stock in ordered status</span>
+                <span class="text-muted small">Serial numbers added when receiving bikes</span>
             </div>
             <div class="card-body">
                 <form method="POST" id="orderForm">
@@ -156,10 +153,7 @@ require_once '../includes/sidebar.php';
                                 <tr>
                                     <th>#</th>
                                     <th style="min-width:160px;">Variant</th>
-                                    <th style="width:120px;">Chassis No</th>
-                                    <th style="width:110px;">Motor No</th>
-                                    <th style="width:110px;">Battery Serial</th>
-                                    <th style="width:110px;">Charger Serial</th>
+                                    <th style="width:70px;">Qty</th>
                                     <th style="width:110px;">Purchase Price</th>
                                     <th style="width:100px;">Sale Price</th>
                                     <th style="width:40px;"></th>
@@ -176,12 +170,9 @@ require_once '../includes/sidebar.php';
                                             <?php endwhile; ?>
                                         </select>
                                     </td>
-                                    <td><input type="text" name="chassis_no[]" class="form-control form-control-sm" placeholder="Chassis"></td>
-                                    <td><input type="text" name="motor_no[]" class="form-control form-control-sm" placeholder="Motor"></td>
-                                    <td><input type="text" name="battery_serial[]" class="form-control form-control-sm" placeholder="Battery"></td>
-                                    <td><input type="text" name="charger_serial[]" class="form-control form-control-sm" placeholder="Charger"></td>
-                                    <td><input type="number" step="0.01" name="purchase_price[]" class="form-control form-control-sm purchase-input" min="0" step="0.01" required placeholder="0"></td>
-                                    <td><input type="number" step="0.01" name="sale_price[]" class="form-control form-control-sm" step="0.01" placeholder="0"></td>
+                                    <td><input type="number" name="qty[]" class="form-control form-control-sm qty-input" min="1" value="1" required></td>
+                                    <td><input type="number" step="0.01" name="purchase_price[]" class="form-control form-control-sm purchase-input" min="0" required placeholder="0"></td>
+                                    <td><input type="number" step="0.01" name="sale_price[]" class="form-control form-control-sm" placeholder="0"></td>
                                     <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-x"></i></button></td>
                                 </tr>
                             </tbody>
@@ -204,13 +195,15 @@ require_once '../includes/sidebar.php';
 <script>
 function calcTotal() {
     var total = 0;
-    document.querySelectorAll('#itemsTable tbody .purchase-input').forEach(function(el) {
-        total += parseFloat(el.value) || 0;
+    document.querySelectorAll('#itemsTable tbody tr').forEach(function(row) {
+        var price = parseFloat(row.querySelector('.purchase-input').value) || 0;
+        var qty = parseInt(row.querySelector('.qty-input').value) || 1;
+        total += price * qty;
     });
     document.getElementById('orderTotal').textContent = total.toFixed(2);
 }
 document.querySelector('#itemsTable tbody').addEventListener('input', function(e) {
-    if (e.target.classList.contains('purchase-input')) calcTotal();
+    if (e.target.classList.contains('purchase-input') || e.target.classList.contains('qty-input')) calcTotal();
 });
 document.querySelector('#itemsTable tbody').addEventListener('change', function(e) {
     if (e.target.classList.contains('variant-select')) {
@@ -224,7 +217,7 @@ document.querySelector('#itemsTable tbody').addEventListener('change', function(
 function addRow() {
     var tbody = document.querySelector('#itemsTable tbody');
     var row = tbody.querySelector('tr').cloneNode(true);
-    row.querySelectorAll('input').forEach(function(e) { e.value = ''; });
+    row.querySelectorAll('input').forEach(function(e) { e.value = e.classList.contains('qty-input') ? '1' : ''; });
     tbody.appendChild(row);
     renumber();
 }

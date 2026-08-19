@@ -5,7 +5,7 @@ requireLogin();
 $showSidebar = true; $base_path = '../';
 
 $customers = $pdo->query("SELECT * FROM customers ORDER BY name");
-$stockItems = $pdo->query("SELECT s.id, s.chassis_no, s.motor_no, s.battery_serial, s.sale_price, s.purchase_price, v.name as vname, v.sale_price as variant_sale, v.purchase_price as variant_purchase, m.name as mname, b.name as bname FROM bike_stock s JOIN bike_variants v ON s.variant_id=v.id JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id WHERE s.status='in_stock' ORDER BY b.name, m.name");
+$variants = $pdo->query("SELECT v.id as vid, v.name as vname, v.sale_price as variant_sale, v.purchase_price as variant_purchase, m.name as mname, b.name as bname, COUNT(s.id) as bike_count FROM bike_variants v JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id JOIN bike_stock s ON s.variant_id=v.id WHERE s.status='in_stock' GROUP BY v.id ORDER BY b.name, m.name, v.name");
 
 $invPrefix = getSetting($pdo, 'invoice_prefix') ?: 'INV-';
 $invNo = nextInvoiceNo($pdo, $invPrefix);
@@ -91,51 +91,53 @@ if (isset($_GET['print'])) {
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
         <style>
             * { font-family: 'Poppins', sans-serif; margin:0; padding:0; box-sizing:border-box; }
-            body { background:#f0f0f0; padding:25px; }
-            .inv { max-width:640px; margin:auto; background:#fff; box-shadow:0 2px 12px rgba(0,0,0,.12); }
-            .inv-inner { padding:28px 32px; }
+            body { background:#f0f0f0; padding:15px; }
+            @page { size: A4; margin: 10mm; }
+            .inv { max-width:700px; margin:auto; background:#fff; box-shadow:0 2px 12px rgba(0,0,0,.12); }
+            .inv-inner { padding:15px 20px; }
             .brand { text-align:center; }
-            .brand h1 { color:#095D3B; font-size:30px; font-weight:700; letter-spacing:1px; margin:0; }
-            .brand .tagline { color:#095D3B; font-weight:600; font-size:11px; letter-spacing:3px; text-transform:uppercase; margin-top:3px; }
-            .brand .meta { color:#666; font-size:11px; margin-top:7px; line-height:1.6; }
-            .brand .meta .meta-line { margin:2px 0; }
-            .brand .meta .meta-line i { color:#095D3B; margin-right:5px; width:14px; text-align:center; }
-            .title-row { border-bottom:3px solid #095D3B; margin-top:14px; padding-bottom:7px; text-align:center; }
-            .title-row h2 { color:#095D3B; font-size:19px; font-weight:700; letter-spacing:5px; margin:0; text-transform:uppercase; }
-            .inv-meta { display:flex; justify-content:space-between; font-size:11px; margin-top:10px; color:#333; }
+            .brand img { width:55px;height:55px;border-radius:50%;object-fit:cover;margin-bottom:5px;border:2px solid #095D3B; }
+            .brand h1 { color:#095D3B; font-size:22px; font-weight:700; letter-spacing:1px; margin:0; }
+            .brand .tagline { color:#095D3B; font-weight:600; font-size:9px; letter-spacing:3px; text-transform:uppercase; margin-top:2px; }
+            .brand .meta { color:#666; font-size:9px; margin-top:4px; line-height:1.4; }
+            .brand .meta .meta-line { margin:1px 0; }
+            .brand .meta .meta-line i { color:#095D3B; margin-right:4px; width:12px; text-align:center; }
+            .title-row { border-bottom:2px solid #095D3B; margin-top:8px; padding-bottom:4px; text-align:center; }
+            .title-row h2 { color:#095D3B; font-size:14px; font-weight:700; letter-spacing:4px; margin:0; text-transform:uppercase; }
+            .inv-meta { display:flex; justify-content:space-between; font-size:10px; margin-top:6px; color:#333; }
             .inv-meta b { font-weight:600; color:#095D3B; }
-            .sec { margin-top:15px; }
-            .sec-bar { background:#095D3B; color:#fff; padding:5px 10px; font-size:10.5px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; }
-            .sec-body { border:1px solid #e4e4e4; border-top:none; padding:10px; }
-            .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:7px 18px; }
-            .grid2 .f span { color:#888; font-size:9px; text-transform:uppercase; letter-spacing:.5px; display:block; }
-            .grid2 .f { color:#222; font-size:12px; }
+            .sec { margin-top:8px; }
+            .sec-bar { background:#095D3B; color:#fff; padding:3px 8px; font-size:9px; font-weight:600; letter-spacing:1px; text-transform:uppercase; }
+            .sec-body { border:1px solid #e4e4e4; border-top:none; padding:6px 8px; }
+            .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:3px 14px; }
+            .grid2 .f span { color:#888; font-size:8px; text-transform:uppercase; letter-spacing:.4px; display:block; }
+            .grid2 .f { color:#222; font-size:10px; }
             .full { grid-column:1 / -1; }
             table.items { width:100%; border-collapse:collapse; }
-            table.items th, table.items td { padding:6px 7px; font-size:10.5px; text-align:left; border-bottom:1px solid #eee; }
-            table.items th { background:#095D3B; color:#fff; font-weight:600; font-size:10px; text-transform:uppercase; letter-spacing:.4px; }
+            table.items th, table.items td { padding:3px 5px; font-size:9px; text-align:left; border-bottom:1px solid #eee; }
+            table.items th { background:#095D3B; color:#fff; font-weight:600; font-size:8px; text-transform:uppercase; letter-spacing:.3px; }
             .bike-name { font-weight:600; color:#095D3B; }
-            .sum .row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; font-size:12px; color:#333; }
+            .sum .row { display:flex; justify-content:space-between; align-items:center; padding:2px 0; font-size:10px; color:#333; }
             .sum .row span:first-child { color:#666; }
-            .sum .net { border-top:2px solid #095D3B; font-weight:700; font-size:14px; margin-top:3px; padding-top:7px; }
+            .sum .net { border-top:2px solid #095D3B; font-weight:700; font-size:11px; margin-top:2px; padding-top:4px; }
             .sum .net span:first-child { color:#095D3B; }
             .sum .paid { color:#1d8a4e; font-weight:700; }
             .sum .due { color:#d62839; font-weight:700; }
-            .pay-badge { display:inline-block; background:#e8f3ee; color:#095D3B; padding:2px 10px; border-radius:10px; font-size:10px; font-weight:600; text-transform:uppercase; }
-            .notes { font-size:10.5px; color:#444; line-height:1.7; white-space:pre-line; }
+            .pay-badge { display:inline-block; background:#e8f3ee; color:#095D3B; padding:1px 6px; border-radius:8px; font-size:8px; font-weight:600; text-transform:uppercase; }
+            .notes { font-size:8px; color:#444; line-height:1.4; white-space:pre-line; }
             .notes b { color:#095D3B; }
-            .foot { background:#095D3B; color:#fff; text-align:center; padding:11px; font-size:11px; font-weight:600; letter-spacing:.5px; }
-            .no-print { text-align:center; margin-top:18px; }
-            .no-print button, .no-print a { display:inline-block; padding:10px 24px; margin:0 5px; border-radius:4px; text-decoration:none; font-size:14px; cursor:pointer; border:none; }
+            .foot { background:#095D3B; color:#fff; text-align:center; padding:6px; font-size:9px; font-weight:600; letter-spacing:.5px; }
+            .no-print { text-align:center; margin-top:12px; }
+            .no-print button, .no-print a { display:inline-block; padding:8px 20px; margin:0 5px; border-radius:4px; text-decoration:none; font-size:13px; cursor:pointer; border:none; }
             .btn-primary { background:#095D3B; color:#fff; }
             .btn-secondary { background:#6c757d; color:#fff; }
-            @media print { body { padding:0; background:#fff; } .inv { box-shadow:none; } .no-print { display:none; } }
+            @media print { body { padding:0; background:#fff; } .inv { box-shadow:none; max-width:100%; } .no-print { display:none; } }
         </style>
         </head><body>
         <div class="inv">
             <div class="inv-inner">
                 <div class="brand">
-                    <img src="../pic/alhafiz.jpeg" alt="Logo" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:10px;border:2px solid #095D3B;">
+                    <img src="../pic/alhafiz.jpeg" alt="Logo">
                     <h1><?php echo COMPANY_NAME; ?></h1>
                     <div class="tagline">EV Scooties &amp; Electric Motorcycles</div>
                     <div class="meta">
@@ -286,19 +288,25 @@ require_once '../includes/sidebar.php';
                         <table class="table table-borderless mb-0" id="itemsTable">
                             <thead class="table-light">
                                 <tr>
-                                    <th style="width:50%;" class="ps-4">Select Bike</th>
-                                    <th style="width:25%;">Sale Price</th>
-                                    <th style="width:10%;"></th>
+                                    <th style="width:30%;" class="ps-4">Variant</th>
+                                    <th style="width:40%;">Select Bike</th>
+                                    <th style="width:20%;">Sale Price</th>
+                                    <th style="width:5%;"></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
                                     <td class="ps-4">
-                                        <select name="stock_id[]" class="form-select" required>
-                                            <option value="">Select Bike</option>
-                                            <?php $stockItems->execute(); while ($s = $stockItems->fetch(PDO::FETCH_ASSOC)): ?>
-                                                <option value="<?php echo $s['id']; ?>" data-price="<?php echo $s['sale_price'] ?: ($s['variant_sale'] ?: $s['variant_purchase']); ?>"><?php echo e($s['bname'] . ' ' . $s['mname'] . ' ' . $s['vname'] . ' [' . $s['chassis_no'] . ']'); ?></option>
+                                        <select name="variant_id[]" class="form-select variant-select" required>
+                                            <option value="">Select Variant</option>
+                                            <?php $variants->execute(); while ($v = $variants->fetch(PDO::FETCH_ASSOC)): ?>
+                                                <option value="<?php echo $v['vid']; ?>" data-price="<?php echo $v['variant_sale'] ?: $v['variant_purchase']; ?>"><?php echo e($v['bname'] . ' ' . $v['mname'] . ' - ' . $v['vname']); ?> (<?php echo $v['bike_count']; ?>)</option>
                                             <?php endwhile; ?>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select name="stock_id[]" class="form-select bike-select" required disabled>
+                                            <option value="">-- Select variant first --</option>
                                         </select>
                                     </td>
                                     <td><input type="number" step="0.01" name="sale_price[]" class="form-control salePrice" placeholder="Enter price" oninput="calcTotal()" required></td>
@@ -366,6 +374,7 @@ require_once '../includes/sidebar.php';
             <a href="sale_list.php" class="text-decoration-none text-muted"><i class="bi bi-arrow-left me-1"></i> View Sales History</a>
         </div>
     </div>
+
 <script>
 function calcTotal() {
     var total = 0;
@@ -387,14 +396,45 @@ function calcSummary() {
     else if (status === 'PARTIAL') { badge.style.background = '#fff3cd'; badge.style.color = '#856404'; }
     else { badge.style.background = '#f8d7da'; badge.style.color = '#721c24'; }
 }
+
 document.getElementById('itemsTable').addEventListener('change', function(e) {
-    if (e.target.matches('select[name="stock_id[]"]')) {
+    if (e.target.classList.contains('variant-select')) {
+        var row = e.target.closest('tr');
+        var bikeSel = row.querySelector('.bike-select');
+        var variantId = e.target.value;
+        if (!variantId) {
+            bikeSel.innerHTML = '<option value="">-- Select variant first --</option>';
+            bikeSel.disabled = true;
+            return;
+        }
+        bikeSel.innerHTML = '<option value="">Loading...</option>';
+        bikeSel.disabled = true;
+        fetch('stock_get.php?variant_id=' + variantId)
+            .then(function(r) { return r.json(); })
+            .then(function(bikes) {
+                var html = '<option value="">-- Select bike (' + bikes.length + ' available) --</option>';
+                bikes.forEach(function(b) {
+                    var label = (b.chassis_no || 'N/A');
+                    if (b.motor_no) label += ' | Motor: ' + b.motor_no;
+                    if (b.battery_serial) label += ' | Battery: ' + b.battery_serial;
+                    if (b.charger_serial) label += ' | Charger: ' + b.charger_serial;
+                    html += '<option value="' + b.id + '" data-price="' + (b.sale_price || 0) + '">' + label + '</option>';
+                });
+                bikeSel.innerHTML = html;
+                bikeSel.disabled = false;
+            });
+    }
+    if (e.target.classList.contains('bike-select')) {
+        var row = e.target.closest('tr');
         var opt = e.target.options[e.target.selectedIndex];
         var price = parseFloat(opt.getAttribute('data-price')) || 0;
-        e.target.closest('tr').querySelector('.salePrice').value = price;
+        if (price > 0 && (!row.querySelector('.salePrice').value || row.querySelector('.salePrice').value == 0)) {
+            row.querySelector('.salePrice').value = price;
+        }
         calcTotal();
     }
 });
+
 function toggleInstallment() {
     var type = document.getElementById('saleType').value;
     if (type === 'cash') {
@@ -408,7 +448,11 @@ function toggleInstallment() {
 function addRow() {
     var tbody = document.querySelector('#itemsTable tbody');
     var row = tbody.querySelector('tr').cloneNode(true);
-    row.querySelectorAll('input, select').forEach(function(e) { if (e.tagName !== 'SELECT') e.value = ''; });
+    row.querySelectorAll('input').forEach(function(e) { e.value = ''; });
+    row.querySelector('.bike-select').innerHTML = '<option value="">-- Select variant first --</option>';
+    row.querySelector('.bike-select').disabled = true;
+    var variantSel = row.querySelector('.variant-select');
+    variantSel.selectedIndex = 0;
     tbody.appendChild(row);
     calcTotal();
 }

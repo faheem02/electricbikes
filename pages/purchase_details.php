@@ -27,8 +27,17 @@ if (!$r) { header('Location: purchase_view.php'); exit; }
 $stock = $pdo->prepare("SELECT s.*, v.name as vname, m.name as mname, b.name as bname FROM bike_stock s JOIN bike_variants v ON s.variant_id=v.id JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id WHERE s.purchase_id=? ORDER BY s.id");
 $stock->execute([$id]);
 $stockItems = $stock->fetchAll(PDO::FETCH_ASSOC);
+$orderedItems = array_filter($stockItems, fn($s) => $s['status'] === 'ordered');
 if ($stockItems):
 ?>
+<?php if (!empty($orderedItems)): ?>
+<div class="mb-2">
+    <button type="button" class="btn btn-sm btn-success" onclick="openReceiveAllModal(<?php echo $id; ?>)">
+        <i class="bi bi-box-seam me-1"></i>Receive All (<?php echo count($orderedItems); ?> bikes)
+    </button>
+</div>
+<?php endif; ?>
+
 <table class="table table-sm table-bordered mb-0">
     <thead class="table-success">
         <tr><th>#</th><th>Variant</th><th>Chassis</th><th>Motor</th><th>Battery</th><th>Charger</th><th>Purchase Price</th><th>Sale Price</th><th>Status</th><th></th></tr>
@@ -51,7 +60,7 @@ if ($stockItems):
             </td>
             <td>
                 <?php if ($s['status'] == 'ordered'): ?>
-                    <a href="purchase_view.php?receive=<?php echo $s['id']; ?>" class="btn btn-sm btn-success">Receive</a>
+                    <button type="button" class="btn btn-sm btn-success" onclick="openReceiveModal(<?php echo $s['id']; ?>, '<?php echo e(addslashes($s['bname'] . ' ' . $s['mname'] . ' ' . $s['vname'])); ?>')"><i class="bi bi-box-seam"></i> Receive</button>
                 <?php else: ?>
                     <span class="text-muted small">--</span>
                 <?php endif; ?>
@@ -63,3 +72,5 @@ if ($stockItems):
 <?php else: ?>
 <p class="text-muted small">No bikes recorded for this purchase order.</p>
 <?php endif; ?>
+
+<!-- Receive modals are in purchase_view.php -->

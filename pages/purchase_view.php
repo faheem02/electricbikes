@@ -3,8 +3,100 @@ require_once '../includes/database.php';
 require_once '../includes/auth.php';
 requireLogin();
 $showSidebar = true; $base_path = '../';
+$err = '';
 
-// Receive a single bike stock (ordered → in_stock)
+// Receive single bike with serial numbers (POST)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive_single'])) {
+    $bid = intval($_POST['receive_id']);
+    $chassis = trim($_POST['chassis_no'] ?? '');
+    $motor = trim($_POST['motor_no'] ?? '');
+    $battery = trim($_POST['battery_serial'] ?? '');
+    $charger = trim($_POST['charger_serial'] ?? '');
+
+    if ($chassis === '') {
+        $err = 'Chassis number is required.';
+    } else {
+        try {
+            $st = $pdo->prepare("SELECT purchase_id FROM bike_stock WHERE id=? AND status='ordered'");
+            $st->execute([$bid]);
+            $bs = $st->fetch(PDO::FETCH_ASSOC);
+            $pid = $bs ? $bs['purchase_id'] : 0;
+
+            $pdo->prepare("UPDATE bike_stock SET chassis_no=?, motor_no=NULLIF(?,''), battery_serial=NULLIF(?,''), charger_serial=NULLIF(?,''), status='in_stock' WHERE id=? AND status='ordered'")
+                ->execute([$chassis, $motor, $battery, $charger, $bid]);
+
+            if ($pid) {
+                $total = $pdo->prepare("SELECT COUNT(*) FROM bike_stock WHERE purchase_id=? AND status IN ('ordered','in_stock')");
+                $total->execute([$pid]);
+                $total = $total->fetchColumn();
+                $received = $pdo->prepare("SELECT COUNT(*) FROM bike_stock WHERE purchase_id=? AND status='in_stock'");
+                $received->execute([$pid]);
+                $received = $received->fetchColumn();
+                $newStatus = $received >= $total ? 'completed' : 'partial';
+                $pdo->prepare("UPDATE purchases SET status=? WHERE id=?")->execute([$newStatus, $pid]);
+                logActivity($pdo, 'Receive Stock', "Purchase #$pid, Received bike_stock #$bid, Chassis: $chassis");
+            }
+            header('Location: purchase_view.php'); exit;
+        } catch (PDOException $e) {
+            if ($e->getCode() == 23000) {
+                $err = 'Duplicate serial number! Chassis, Motor, Battery, or Charger already exists.';
+            } else {
+                throw $e;
+            }
+        }
+    }
+}
+
+// Receive all bikes with serial numbers (POST)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive_all_submit'])) {
+    $pid = intval($_POST['purchase_id']);
+    $ids = $_POST['receive_all_ids'] ?? [];
+    $chassisList = $_POST['all_chassis_no'] ?? [];
+    $motorList = $_POST['all_motor_no'] ?? [];
+    $batteryList = $_POST['all_battery_serial'] ?? [];
+    $chargerList = $_POST['all_charger_serial'] ?? [];
+
+    $valid = true;
+    foreach ($chassisList as $ch) {
+        if (trim($ch) === '') { $valid = false; break; }
+    }
+
+    if (!$valid || empty($ids)) {
+        $err = 'Chassis number is required for every bike.';
+    } else {
+        try {
+            $upd = $pdo->prepare("UPDATE bike_stock SET chassis_no=?, motor_no=NULLIF(?,''), battery_serial=NULLIF(?,''), charger_serial=NULLIF(?,''), status='in_stock' WHERE id=? AND status='ordered'");
+            foreach ($ids as $i => $bid) {
+                $upd->execute([
+                    $chassisList[$i],
+                    $motorList[$i] ?? '',
+                    $batteryList[$i] ?? '',
+                    $chargerList[$i] ?? '',
+                    $bid
+                ]);
+            }
+
+            $total = $pdo->prepare("SELECT COUNT(*) FROM bike_stock WHERE purchase_id=? AND status IN ('ordered','in_stock')");
+            $total->execute([$pid]);
+            $total = $total->fetchColumn();
+            $received = $pdo->prepare("SELECT COUNT(*) FROM bike_stock WHERE purchase_id=? AND status='in_stock'");
+            $received->execute([$pid]);
+            $received = $received->fetchColumn();
+            $newStatus = $received >= $total ? 'completed' : 'partial';
+            $pdo->prepare("UPDATE purchases SET status=? WHERE id=?")->execute([$newStatus, $pid]);
+            logActivity($pdo, 'Receive Stock', "Purchase #$pid, Received " . count($ids) . " bikes");
+            header('Location: purchase_view.php'); exit;
+        } catch (PDOException $e) {
+            if ($e->getCode() == 23000) {
+                $err = 'Duplicate serial number! One or more Chassis, Motor, Battery, or Charger numbers already exist.';
+            } else {
+                throw $e;
+            }
+        }
+    }
+}
+
+// Receive a single bike stock (GET - legacy fallback)
 if (isset($_GET['receive'])) {
     $bid = intval($_GET['receive']);
     $st = $pdo->prepare("SELECT purchase_id FROM bike_stock WHERE id=?");
@@ -276,6 +368,12 @@ require_once '../includes/sidebar.php';
         </span>
     </div>
     <div class="main-content">
+        <?php if (!empty($err)): ?>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <?php echo e($err); ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-clock-history me-2"></i>Purchase History</span>
@@ -323,7 +421,7 @@ require_once '../includes/sidebar.php';
                                     <a href="?print_order=<?php echo $r['id']; ?>" target="_blank" class="btn btn-sm btn-outline-info" title="Print Order"><i class="bi bi-printer"></i></a>
                                     <button type="button" class="btn btn-sm btn-outline-info" onclick="viewDetails(<?php echo $r['id']; ?>)" title="View Details"><i class="bi bi-eye"></i></button>
                                     <?php if ($pending > 0): ?>
-                                        <a href="?receive_all=<?php echo $r['id']; ?>" class="btn btn-sm btn-success" onclick="return confirm('Receive all ordered bikes?')" title="Receive All"><i class="bi bi-box-seam"></i></a>
+                                        <button type="button" class="btn btn-sm btn-success" onclick="viewDetails(<?php echo $r['id']; ?>)" title="Receive Bikes"><i class="bi bi-box-seam"></i></button>
                                     <?php endif; ?>
                                     <a href="purchases.php?delete=<?php echo $r['id']; ?>&redirect=view" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this purchase order? All related bike stock will be deleted.')"><i class="bi bi-trash"></i></a>
                                 </td>
@@ -351,17 +449,93 @@ require_once '../includes/sidebar.php';
         </div>
     </div>
 
+    <!-- Receive Single Bike Modal (top-level, not nested) -->
+    <div class="modal fade" id="receiveModal" tabindex="-1">
+        <div class="modal-dialog">
+            <form method="POST" action="purchase_view.php">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h6 class="modal-title"><i class="bi bi-box-seam me-1"></i>Receive Bike</h6>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <?php echo csrfField(); ?>
+                        <input type="hidden" name="receive_id" id="receive_id">
+                        <p class="mb-3"><strong id="receiveBikeName"></strong></p>
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Chassis No <span class="text-danger">*</span></label>
+                            <input type="text" name="chassis_no" class="form-control" required placeholder="Enter chassis number">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Motor No</label>
+                            <input type="text" name="motor_no" class="form-control" placeholder="Enter motor number">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Battery Serial</label>
+                            <input type="text" name="battery_serial" class="form-control" placeholder="Enter battery serial">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Charger Serial</label>
+                            <input type="text" name="charger_serial" class="form-control" placeholder="Enter charger serial">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" name="receive_single" class="btn btn-success btn-sm"><i class="bi bi-check-lg"></i> Receive</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Receive All Modal (top-level, not nested) -->
+    <div class="modal fade" id="receiveAllModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h6 class="modal-title"><i class="bi bi-box-seam me-1"></i>Receive All Bikes</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="receiveAllBody">
+                    <div class="text-center text-muted py-3">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 <script>
+var detailsModalInstance = null;
+
 function viewDetails(id) {
     var body = document.getElementById('detailsBody');
     body.innerHTML = '<div class="text-center text-muted py-3">Loading...</div>';
-    var modal = new bootstrap.Modal(document.getElementById('detailsModal'));
-    modal.show();
+    detailsModalInstance = new bootstrap.Modal(document.getElementById('detailsModal'));
+    detailsModalInstance.show();
 
     fetch('purchase_details.php?id=' + id)
         .then(function(r) { return r.text(); })
         .then(function(html) { body.innerHTML = html; })
         .catch(function() { body.innerHTML = '<div class="alert alert-danger">Failed to load details.</div>'; });
+}
+
+function openReceiveModal(id, name) {
+    if (detailsModalInstance) { detailsModalInstance.hide(); }
+    document.getElementById('receive_id').value = id;
+    document.getElementById('receiveBikeName').textContent = name;
+    var m = new bootstrap.Modal(document.getElementById('receiveModal'));
+    m.show();
+}
+
+function openReceiveAllModal(purchaseId) {
+    if (detailsModalInstance) { detailsModalInstance.hide(); }
+    var body = document.getElementById('receiveAllBody');
+    body.innerHTML = '<div class="text-center text-muted py-3">Loading...</div>';
+    var m = new bootstrap.Modal(document.getElementById('receiveAllModal'));
+    m.show();
+    fetch('receive_all_form.php?purchase_id=' + purchaseId)
+        .then(function(r) { return r.text(); })
+        .then(function(html) { body.innerHTML = html; })
+        .catch(function() { body.innerHTML = '<div class="alert alert-danger">Failed to load form.</div>'; });
 }
 </script>
 <?php require_once '../includes/footer.php'; ?>
