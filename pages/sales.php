@@ -92,7 +92,7 @@ if (isset($_GET['print'])) {
         <style>
             * { font-family: 'Poppins', sans-serif; margin:0; padding:0; box-sizing:border-box; }
             body { background:#f0f0f0; padding:15px; }
-            @page { size: A4; margin: 10mm; }
+            @page { size: A4; margin: 0; }
             .inv { max-width:700px; margin:auto; background:#fff; box-shadow:0 2px 12px rgba(0,0,0,.12); }
             .inv-inner { padding:15px 20px; }
             .brand { text-align:center; }
@@ -131,7 +131,7 @@ if (isset($_GET['print'])) {
             .no-print button, .no-print a { display:inline-block; padding:8px 20px; margin:0 5px; border-radius:4px; text-decoration:none; font-size:13px; cursor:pointer; border:none; }
             .btn-primary { background:#095D3B; color:#fff; }
             .btn-secondary { background:#6c757d; color:#fff; }
-            @media print { body { padding:0; background:#fff; } .inv { box-shadow:none; max-width:100%; } .no-print { display:none; } }
+            @media print { @page { size: A4; margin: 0; } body { padding:0; background:#fff; margin:0; } .inv { box-shadow:none; max-width:100%; } .no-print { display:none; } }
         </style>
         </head><body>
         <div class="inv">
