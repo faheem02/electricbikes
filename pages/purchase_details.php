@@ -24,7 +24,7 @@ if (!$r) { header('Location: purchase_view.php'); exit; }
 
 <h6 class="fw-semibold mb-2"><i class="bi bi-box-seam me-1"></i>Bikes</h6>
 <?php
-$stock = $pdo->prepare("SELECT s.*, v.name as vname, m.name as mname, b.name as bname FROM bike_stock s JOIN bike_variants v ON s.variant_id=v.id JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id WHERE s.purchase_id=? ORDER BY s.id");
+$stock = $pdo->prepare("SELECT s.*, v.name as vname, v.color, m.name as mname, b.name as bname FROM bike_stock s JOIN bike_variants v ON s.variant_id=v.id JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id WHERE s.purchase_id=? ORDER BY s.id");
 $stock->execute([$id]);
 $stockItems = $stock->fetchAll(PDO::FETCH_ASSOC);
 $orderedItems = array_filter($stockItems, fn($s) => $s['status'] === 'ordered');
@@ -46,7 +46,7 @@ if ($stockItems):
     <?php $i=1; foreach ($stockItems as $s): ?>
         <tr>
             <td><?php echo $i++; ?></td>
-            <td><?php echo e($s['bname'] . ' ' . $s['mname'] . ' ' . $s['vname']); ?></td>
+            <td><?php echo e($s['bname'] . ' ' . $s['mname'] . ' ' . $s['vname']); ?><?php if ($s['color']): ?> <span class="badge bg-light text-muted border ms-1"><?php echo e($s['color']); ?></span><?php endif; ?></td>
             <td><?php echo e($s['chassis_no'] ?: '-'); ?></td>
             <td><?php echo e($s['motor_no'] ?: '-'); ?></td>
             <td><?php echo e($s['battery_serial'] ?: '-'); ?></td>
@@ -60,7 +60,7 @@ if ($stockItems):
             </td>
             <td>
                 <?php if ($s['status'] == 'ordered'): ?>
-                    <button type="button" class="btn btn-sm btn-success" onclick="openReceiveModal(<?php echo $s['id']; ?>, '<?php echo e(addslashes($s['bname'] . ' ' . $s['mname'] . ' ' . $s['vname'])); ?>')"><i class="bi bi-box-seam"></i> Receive</button>
+                    <button type="button" class="btn btn-sm btn-success" onclick="openReceiveModal(<?php echo $s['id']; ?>, '<?php echo e(addslashes($s['bname'] . ' ' . $s['mname'] . ' ' . $s['vname'] . ($s['color'] ? ' [' . $s['color'] . ']' : ''))); ?>')"><i class="bi bi-box-seam"></i> Receive</button>
                 <?php else: ?>
                     <span class="text-muted small">--</span>
                 <?php endif; ?>

@@ -11,12 +11,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_stock'])) {
+    $variantId  = intval($_POST['variant_id']);
+    $purchaseP  = floatval($_POST['purchase_price'] ?? 0);
+    $saleP      = floatval($_POST['sale_price'] ?? 0);
+    $chassis    = trim($_POST['chassis_no'] ?? '');
+    $motor      = trim($_POST['motor_no'] ?? '');
+    $battery    = trim($_POST['battery_serial'] ?? '');
+    $charger    = trim($_POST['charger_serial'] ?? '');
+
+    // If prices not provided, fall back to variant prices
+    if ($purchaseP <= 0 || $saleP <= 0) {
+        $vp = $pdo->prepare("SELECT purchase_price, sale_price FROM bike_variants WHERE id=?");
+        $vp->execute([$variantId]);
+        $vRow = $vp->fetch(PDO::FETCH_ASSOC);
+        if ($purchaseP <= 0) $purchaseP = floatval($vRow['purchase_price'] ?? 0);
+        if ($saleP     <= 0) $saleP     = floatval($vRow['sale_price']     ?? 0);
+    }
+
     try {
-        $pdo->prepare("INSERT INTO bike_stock (variant_id, chassis_no, motor_no, battery_serial, charger_serial, status, created_at) VALUES (?,?,?,?,?,'in_stock',CURDATE())")->execute([$_POST['variant_id'], $_POST['chassis_no'], $_POST['motor_no'], $_POST['battery_serial'], $_POST['charger_serial']]);
+        $pdo->prepare("INSERT INTO bike_stock (variant_id, purchase_price, sale_price, chassis_no, motor_no, battery_serial, charger_serial, status, created_at) VALUES (?,?,?,NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),'in_stock',CURDATE())")
+            ->execute([$variantId, $purchaseP, $saleP, $chassis, $motor, $battery, $charger]);
+        logActivity($pdo, 'Add Stock', "Variant #$variantId, Chassis: " . ($chassis ?: 'N/A'));
         header('Location: stock_entry.php'); exit;
     } catch (PDOException $e) {
         if ($e->getCode() == 23000) {
-            $dupErr = 'Duplicate entry! Chassis, Motor, Battery, and Charger numbers must be unique.';
+            $stockErr = 'Duplicate serial number! Chassis, Motor, Battery, or Charger already exists in stock.';
         } else {
             throw $e;
         }
@@ -34,6 +53,12 @@ require_once '../includes/sidebar.php';
         <div class="user-info"><i class="bi bi-person-circle"></i> <?php echo $_SESSION['full_name'] ?? ''; ?> <button class="btn btn-sm btn-outline-secondary" onclick="toggleTheme()"><i class="bi bi-moon-fill"></i></button></div>
     </div>
     <div class="main-content">
+        <?php if (!empty($err)): ?>
+            <div class="alert alert-danger"><?php echo e($err); ?></div>
+        <?php endif; ?>
+        <?php if (!empty($stockErr)): ?>
+            <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i><?php echo e($stockErr); ?></div>
+        <?php endif; ?>
         <div class="row g-3">
             <div class="col-md-6">
                 <div class="card h-100">
@@ -64,25 +89,31 @@ require_once '../includes/sidebar.php';
                 <div class="card h-100">
                     <div class="card-header"><i class="bi bi-box-seam me-2"></i>Add Stock Unit</div>
                     <div class="card-body">
-                        <?php if (!empty($dupErr)): ?>
-                            <div class="alert alert-danger py-2"><?php echo e($dupErr); ?></div>
-                        <?php endif; ?>
                         <form method="POST">
                             <?php echo csrfField(); ?>
                             <div class="mb-2">
-                                <select name="variant_id" class="form-select" required>
+                                <select name="variant_id" class="form-select" id="stockVariantSel" required>
                                     <option value="">Select Variant</option>
                                     <?php
                                     $allv = $pdo->query("SELECT v.*, m.name as mname, b.name as bname FROM bike_variants v JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id ORDER BY b.name, m.name, v.name");
-                                    while ($v = $allv->fetch(PDO::FETCH_ASSOC)):
+                                    $allvRows = $allv->fetchAll(PDO::FETCH_ASSOC);
+                                    foreach ($allvRows as $v):
                                     ?>
-                                        <option value="<?php echo $v['id']; ?>"><?php echo e($v['bname'] . ' ' . $v['mname'] . ' - ' . $v['name'] . ' (' . $v['color'] . ')'); ?></option>
-                                    <?php endwhile; ?>
+                                        <option value="<?php echo $v['id']; ?>"
+                                            data-purchase="<?php echo $v['purchase_price']; ?>"
+                                            data-sale="<?php echo $v['sale_price']; ?>">
+                                            <?php echo e($v['bname'] . ' ' . $v['mname'] . ' - ' . $v['name'] . ($v['color'] ? ' (' . $v['color'] . ')' : '')); ?>
+                                        </option>
+                                    <?php endforeach; ?>
                                 </select>
                             </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6"><input type="number" step="0.01" name="purchase_price" id="stockPurchasePrice" class="form-control" placeholder="Purchase Price"></div>
+                                <div class="col-6"><input type="number" step="0.01" name="sale_price" id="stockSalePrice" class="form-control" placeholder="Sale Price"></div>
+                            </div>
                             <div class="mb-2"><input type="text" name="chassis_no" class="form-control" placeholder="Chassis Number *" required></div>
-                            <div class="mb-2"><input type="text" name="motor_no" class="form-control" placeholder="Motor Number *"></div>
-                            <div class="mb-2"><input type="text" name="battery_serial" class="form-control" placeholder="Battery Serial *"></div>
+                            <div class="mb-2"><input type="text" name="motor_no" class="form-control" placeholder="Motor Number"></div>
+                            <div class="mb-2"><input type="text" name="battery_serial" class="form-control" placeholder="Battery Serial"></div>
                             <div class="mb-2"><input type="text" name="charger_serial" class="form-control" placeholder="Charger Serial"></div>
                             <button type="submit" name="add_stock" class="btn btn-success w-100">Add to Stock</button>
                         </form>
@@ -91,4 +122,13 @@ require_once '../includes/sidebar.php';
             </div>
         </div>
     </div>
+<script>
+document.getElementById('stockVariantSel').addEventListener('change', function() {
+    var opt = this.options[this.selectedIndex];
+    var pp = opt.getAttribute('data-purchase') || '';
+    var sp = opt.getAttribute('data-sale') || '';
+    document.getElementById('stockPurchasePrice').value = pp > 0 ? pp : '';
+    document.getElementById('stockSalePrice').value = sp > 0 ? sp : '';
+});
+</script>
 <?php require_once '../includes/footer.php'; ?>

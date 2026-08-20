@@ -33,11 +33,12 @@ $inStock = count(array_filter($stockItems, fn($s) => $s['status'] === 'in_stock'
 <?php if ($stockItems): ?>
 <table class="table table-sm table-bordered mb-0">
     <thead class="table-light">
-        <tr><th>#</th><th>Chassis</th><th>Motor</th><th>Battery</th><th>Charger</th><th class="text-end">Purchase</th><th class="text-end">Sale</th><th>Status</th></tr>
+        <tr><th>#</th><th>Chassis</th><th>Motor</th><th>Battery</th><th>Charger</th><th class="text-end">Purchase</th><th class="text-end">Sale</th><th>Status</th><th class="text-center">Action</th></tr>
     </thead>
     <tbody>
     <?php $i = 1; foreach ($stockItems as $s): ?>
-        <tr>
+        <?php $canDelete = !in_array($s['status'], ['sold', 'booked']); ?>
+        <tr id="stock-row-<?php echo $s['id']; ?>">
             <td><?php echo $i++; ?></td>
             <td><?php echo e($s['chassis_no'] ?: '-'); ?></td>
             <td><?php echo e($s['motor_no'] ?: '-'); ?></td>
@@ -50,10 +51,51 @@ $inStock = count(array_filter($stockItems, fn($s) => $s['status'] === 'in_stock'
                     <?php echo ucfirst(str_replace('_', ' ', $s['status'])); ?>
                 </span>
             </td>
+            <td class="text-center">
+                <?php if ($canDelete): ?>
+                <button type="button" class="btn btn-sm btn-outline-danger"
+                    onclick="deleteStockUnit(<?php echo $s['id']; ?>, '<?php echo e($s['chassis_no'] ?: 'N/A'); ?>')"
+                    title="Delete Unit">
+                    <i class="bi bi-trash"></i>
+                </button>
+                <?php else: ?>
+                <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Cannot delete <?php echo $s['status']; ?> unit">
+                    <i class="bi bi-trash"></i>
+                </button>
+                <?php endif; ?>
+            </td>
         </tr>
     <?php endforeach; ?>
     </tbody>
 </table>
+<script>
+function deleteStockUnit(stockId, chassis) {
+    Swal.fire({
+        title: 'Delete Stock Unit?',
+        html: 'Chassis: <strong>' + chassis + '</strong><br>This action cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel'
+    }).then(function(result) {
+        if (!result.isConfirmed) return;
+        fetch('products.php?delete_stock=' + stockId)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    Swal.fire('Error', data.error, 'error');
+                } else {
+                    var row = document.getElementById('stock-row-' + stockId);
+                    if (row) row.remove();
+                    Swal.fire({ title: 'Deleted!', text: 'Stock unit removed.', icon: 'success', timer: 1500, showConfirmButton: false });
+                }
+            })
+            .catch(function() { Swal.fire('Error', 'Failed to delete unit.', 'error'); });
+    });
+}
+</script>
 <?php else: ?>
 <p class="text-muted small mb-0">No stock units for this product yet.</p>
 <?php endif; ?>

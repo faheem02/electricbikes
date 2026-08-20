@@ -28,6 +28,23 @@ if (isset($_GET['delete_variant'])) {
     header('Location: products.php'); exit;
 }
 
+if (isset($_GET['delete_stock'])) {
+    $stockId = intval($_GET['delete_stock']);
+    $variantId = intval($_GET['variant_id'] ?? 0);
+    $row = $pdo->prepare("SELECT chassis_no, status FROM bike_stock WHERE id=?");
+    $row->execute([$stockId]);
+    $unit = $row->fetch(PDO::FETCH_ASSOC);
+    if ($unit && in_array($unit['status'], ['sold', 'booked'])) {
+        // Cannot delete sold/booked units — return JSON error for AJAX
+        echo json_encode(['error' => 'Cannot delete a unit that is sold or booked.']);
+        exit;
+    }
+    $pdo->prepare("DELETE FROM bike_stock WHERE id=?")->execute([$stockId]);
+    logActivity($pdo, 'Stock Unit Deleted', "bike_stock #$stockId chassis: " . ($unit['chassis_no'] ?: 'N/A'));
+    echo json_encode(['success' => true]);
+    exit;
+}
+
 $products = $pdo->query("
     SELECT v.id as variant_id, b.name as brand_name, m.name as model_name, v.name as variant_name, v.color,
         v.purchase_price, v.sale_price,

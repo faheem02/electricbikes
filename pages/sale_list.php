@@ -21,7 +21,7 @@ if (isset($_GET['deliver'])) {
 }
 
 $result = $pdo->query("SELECT s.*, c.name as cname,
-    GROUP_CONCAT(DISTINCT CONCAT(b.name, ' ', m.name, ' ', v.name, ' (', st.chassis_no, ')') SEPARATOR '<br>') as bikes,
+    GROUP_CONCAT(DISTINCT CONCAT(b.name, ' ', m.name, ' ', v.name, IF(v.color IS NULL OR v.color='', '', CONCAT(' [', v.color, ']')), ' (', st.chassis_no, ')') SEPARATOR '<br>') as bikes,
     CASE WHEN s.sale_type='cash' THEN s.total_amount ELSE s.down_payment END as paid_amount
     FROM sales s
     LEFT JOIN customers c ON s.customer_id=c.id

@@ -1,6 +1,7 @@
 <?php
 require_once 'includes/database.php';
 require_once 'includes/auth.php';
+require_once 'includes/company.php';
 
 if (isLoggedIn()) {
     header('Location: index.php');
@@ -66,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
         .login-card .brand { text-align: center; margin-bottom: 30px; }
-        .login-card .brand i { font-size: 48px; color: var(--primary); }
+        .login-card .brand img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary); margin-bottom: 10px; }
         .login-card .brand h2 { font-weight: 700; color: #333; margin-top: 10px; font-size: 22px; }
         .login-card .brand p { color: #888; font-size: 13px; margin: 0; }
         .form-control { border-radius: 8px; padding: 12px 15px; border: 1px solid #ddd; font-size: 14px; }
@@ -82,9 +83,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body>
     <div class="login-card">
         <div class="brand">
-            <i class="bi bi-bicycle"></i>
-            <h2>Electric Bikes ERP</h2>
-            <p>Sale, Purchase & Service Management</p>
+            <img src="pic/alhafiz.jpeg" alt="Logo">
+            <h2><?php echo COMPANY_NAME; ?></h2>
+            <p><?php echo COMPANY_TAGLINE; ?></p>
         </div>
         <?php if ($error): ?>
             <div class="alert alert-danger"><?php echo $error; ?></div>

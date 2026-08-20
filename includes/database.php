@@ -83,13 +83,15 @@ $tables = [
     "CREATE TABLE IF NOT EXISTS bike_stock (
         id INT AUTO_INCREMENT PRIMARY KEY,
         variant_id INT,
-        chassis_no VARCHAR(50) UNIQUE,
-        motor_no VARCHAR(50) UNIQUE,
-        battery_serial VARCHAR(50) UNIQUE,
-        charger_serial VARCHAR(50) UNIQUE,
+        chassis_no VARCHAR(50),
+        motor_no VARCHAR(50),
+        battery_serial VARCHAR(50),
+        charger_serial VARCHAR(50),
         status ENUM('ordered','in_stock','sold','booked','damaged') DEFAULT 'in_stock',
         purchase_id INT,
         sale_id INT,
+        purchase_price DECIMAL(12,2) DEFAULT 0.00,
+        sale_price DECIMAL(12,2) DEFAULT 0.00,
         created_at DATE,
         FOREIGN KEY (variant_id) REFERENCES bike_variants(id) ON DELETE CASCADE
     )",
@@ -275,6 +277,16 @@ try { $pdo->exec("ALTER TABLE bike_stock MODIFY COLUMN status ENUM('ordered','in
 $idxAdd('bike_stock', 'idx_motor_no', 'motor_no');
 $idxAdd('bike_stock', 'idx_battery_serial', 'battery_serial');
 $idxAdd('bike_stock', 'idx_charger_serial', 'charger_serial');
+
+// Drop UNIQUE indexes from bike_stock (serials no longer need to be unique)
+try { $pdo->exec("ALTER TABLE bike_stock DROP INDEX chassis_no"); } catch (PDOException $e) {}
+try { $pdo->exec("ALTER TABLE bike_stock MODIFY COLUMN chassis_no VARCHAR(50)"); } catch (PDOException $e) {}
+try { $pdo->exec("ALTER TABLE bike_stock DROP INDEX idx_motor_no"); } catch (PDOException $e) {}
+try { $pdo->exec("ALTER TABLE bike_stock MODIFY COLUMN motor_no VARCHAR(50)"); } catch (PDOException $e) {}
+try { $pdo->exec("ALTER TABLE bike_stock DROP INDEX idx_battery_serial"); } catch (PDOException $e) {}
+try { $pdo->exec("ALTER TABLE bike_stock MODIFY COLUMN battery_serial VARCHAR(50)"); } catch (PDOException $e) {}
+try { $pdo->exec("ALTER TABLE bike_stock DROP INDEX idx_charger_serial"); } catch (PDOException $e) {}
+try { $pdo->exec("ALTER TABLE bike_stock MODIFY COLUMN charger_serial VARCHAR(50)"); } catch (PDOException $e) {}
 
 // Drop products table (legacy — replaced by bike_stock)
 try { $pdo->exec("DROP TABLE IF EXISTS products"); } catch (PDOException $e) {}

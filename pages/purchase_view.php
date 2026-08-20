@@ -135,7 +135,7 @@ if (isset($_GET['receive_all'])) {
     header('Location: purchase_view.php'); exit;
 }
 
-// Print a single purchase order with per-bike details
+// Print a single purchase order grouped by variant (no serial numbers)
 if (isset($_GET['print_order'])) {
     $oid = intval($_GET['print_order']);
     require_once __DIR__ . '/../includes/company.php';
@@ -143,9 +143,26 @@ if (isset($_GET['print_order'])) {
     $p->execute([$oid]);
     $po = $p->fetch(PDO::FETCH_ASSOC);
     if (!$po) { header('Location: purchase_view.php'); exit; }
-    $stock = $pdo->prepare("SELECT s.*, v.name as vname, v.color, m.name as mname, b.name as bname FROM bike_stock s JOIN bike_variants v ON s.variant_id=v.id JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id WHERE s.purchase_id=? ORDER BY s.id");
+    $stock = $pdo->prepare("SELECT s.*, v.name as vname, v.color, m.name as mname, b.name as bname FROM bike_stock s JOIN bike_variants v ON s.variant_id=v.id JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id WHERE s.purchase_id=? ORDER BY b.name, m.name, v.name, s.id");
     $stock->execute([$oid]);
     $stockItems = $stock->fetchAll(PDO::FETCH_ASSOC);
+
+    $grouped = [];
+    foreach ($stockItems as $bs) {
+        $key = $bs['variant_id'];
+        if (!isset($grouped[$key])) {
+            $grouped[$key] = [
+                'name' => trim($bs['bname'] . ' ' . $bs['mname'] . ' ' . $bs['vname'] . ($bs['color'] ? ' [' . $bs['color'] . ']' : '')),
+                'qty' => 0,
+                'purchase_price' => $bs['purchase_price'],
+                'sale_price' => $bs['sale_price'],
+                'total' => 0,
+            ];
+        }
+        $grouped[$key]['qty']++;
+        $grouped[$key]['total'] += $bs['purchase_price'];
+    }
+
     $poCost = $po['total_amount'] + $po['expenses'];
     $poDue = max(0, $poCost - $po['paid_amount']);
     ?>
@@ -154,56 +171,54 @@ if (isset($_GET['print_order'])) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         * { font-family: 'Poppins', sans-serif; margin:0; padding:0; box-sizing:border-box; }
-        body { background:#f0f0f0; padding:25px; }
-        .inv { max-width:760px; margin:auto; background:#fff; box-shadow:0 2px 12px rgba(0,0,0,.12); }
-        .inv-inner { padding:28px 32px; }
+        body { background:#f0f0f0; padding:15px; }
+        @page { size: A4; margin: 0; }
+        .inv { max-width:700px; margin:auto; background:#fff; box-shadow:0 2px 12px rgba(0,0,0,.12); }
+        .inv-inner { padding:15px 20px; }
         .brand { text-align:center; }
-        .brand h1 { color:#095D3B; font-size:30px; font-weight:700; letter-spacing:1px; margin:0; }
-        .brand .tagline { color:#095D3B; font-weight:600; font-size:11px; letter-spacing:3px; text-transform:uppercase; margin-top:3px; }
-        .brand .meta { color:#666; font-size:11px; margin-top:7px; line-height:1.6; }
-        .brand .meta .meta-line { margin:2px 0; }
-        .brand .meta .meta-line i { color:#095D3B; margin-right:5px; width:14px; text-align:center; }
-        .title-row { border-bottom:3px solid #095D3B; margin-top:14px; padding-bottom:7px; text-align:center; }
-        .title-row h2 { color:#095D3B; font-size:19px; font-weight:700; letter-spacing:5px; margin:0; text-transform:uppercase; }
-        .inv-meta { display:flex; justify-content:space-between; font-size:11px; margin-top:10px; color:#333; }
+        .brand img { width:55px;height:55px;border-radius:50%;object-fit:cover;margin-bottom:5px;border:2px solid #095D3B; }
+        .brand h1 { color:#095D3B; font-size:22px; font-weight:700; letter-spacing:1px; margin:0; }
+        .brand .tagline { color:#095D3B; font-weight:600; font-size:9px; letter-spacing:3px; text-transform:uppercase; margin-top:2px; }
+        .brand .meta { color:#666; font-size:9px; margin-top:4px; line-height:1.4; }
+        .brand .meta .meta-line { margin:1px 0; }
+        .brand .meta .meta-line i { color:#095D3B; margin-right:4px; width:12px; text-align:center; }
+        .title-row { border-bottom:2px solid #095D3B; margin-top:8px; padding-bottom:4px; text-align:center; }
+        .title-row h2 { color:#095D3B; font-size:14px; font-weight:700; letter-spacing:4px; margin:0; text-transform:uppercase; }
+        .inv-meta { display:flex; justify-content:space-between; font-size:10px; margin-top:6px; color:#333; }
         .inv-meta b { font-weight:600; color:#095D3B; }
-        .sec { margin-top:15px; }
-        .sec-bar { background:#095D3B; color:#fff; padding:5px 10px; font-size:10.5px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; }
-        .sec-body { border:1px solid #e4e4e4; border-top:none; padding:10px; }
-        .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:7px 18px; }
-        .grid2 .f span { color:#888; font-size:9px; text-transform:uppercase; letter-spacing:.5px; display:block; }
-        .grid2 .f { color:#222; font-size:12px; }
+        .sec { margin-top:8px; }
+        .sec-bar { background:#095D3B; color:#fff; padding:3px 8px; font-size:9px; font-weight:600; letter-spacing:1px; text-transform:uppercase; }
+        .sec-body { border:1px solid #e4e4e4; border-top:none; padding:6px 8px; }
+        .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:3px 14px; }
+        .grid2 .f span { color:#888; font-size:8px; text-transform:uppercase; letter-spacing:.4px; display:block; }
+        .grid2 .f { color:#222; font-size:10px; }
         .full { grid-column:1 / -1; }
         table.items { width:100%; border-collapse:collapse; }
-        table.items th, table.items td { padding:6px 7px; font-size:10.5px; text-align:left; border-bottom:1px solid #eee; }
-        table.items th { background:#095D3B; color:#fff; font-weight:600; font-size:10px; text-transform:uppercase; letter-spacing:.4px; }
-        .text-end { text-align:right; }
+        table.items th, table.items td { padding:3px 5px; font-size:9px; text-align:left; border-bottom:1px solid #eee; }
+        table.items th { background:#095D3B; color:#fff; font-weight:600; font-size:8px; text-transform:uppercase; letter-spacing:.3px; }
         .bike-name { font-weight:600; color:#095D3B; }
-        .st { display:inline-block; padding:2px 8px; border-radius:10px; font-size:9px; font-weight:600; text-transform:uppercase; }
-        .st-ordered { background:#6c757d; color:#fff; }
-        .st-in_stock { background:#28a745; color:#fff; }
-        .st-sold { background:#0d6efd; color:#fff; }
-        .st-booked { background:#ffc107; color:#333; }
-        .st-damaged { background:#dc3545; color:#fff; }
-        .sum .row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; font-size:12px; color:#333; }
+        .text-end { text-align:right; }
+        .sum .row { display:flex; justify-content:space-between; align-items:center; padding:2px 0; font-size:10px; color:#333; }
         .sum .row span:first-child { color:#666; }
-        .sum .net { border-top:2px solid #095D3B; font-weight:700; font-size:14px; margin-top:3px; padding-top:7px; }
+        .sum .net { border-top:2px solid #095D3B; font-weight:700; font-size:11px; margin-top:2px; padding-top:4px; }
         .sum .net span:first-child { color:#095D3B; }
         .sum .paid { color:#1d8a4e; font-weight:700; }
         .sum .due { color:#d62839; font-weight:700; }
-        .pay-badge { display:inline-block; background:#e8f3ee; color:#095D3B; padding:2px 10px; border-radius:10px; font-size:10px; font-weight:600; text-transform:uppercase; }
-        .foot { background:#095D3B; color:#fff; text-align:center; padding:11px; font-size:11px; font-weight:600; letter-spacing:.5px; }
-        .no-print { text-align:center; margin-top:18px; }
-        .no-print button { display:inline-block; padding:10px 24px; margin:0 5px; border-radius:4px; font-size:14px; cursor:pointer; border:none; }
+        .pay-badge { display:inline-block; background:#e8f3ee; color:#095D3B; padding:1px 6px; border-radius:8px; font-size:8px; font-weight:600; text-transform:uppercase; }
+        .notes { font-size:8px; color:#444; line-height:1.4; white-space:pre-line; }
+        .notes b { color:#095D3B; }
+        .foot { background:#095D3B; color:#fff; text-align:center; padding:6px; font-size:9px; font-weight:600; letter-spacing:.5px; }
+        .no-print { text-align:center; margin-top:12px; }
+        .no-print button, .no-print a { display:inline-block; padding:8px 20px; margin:0 5px; border-radius:4px; text-decoration:none; font-size:13px; cursor:pointer; border:none; }
         .btn-primary { background:#095D3B; color:#fff; }
         .btn-secondary { background:#6c757d; color:#fff; }
-        @media print { body { padding:0; background:#fff; } .inv { box-shadow:none; } .no-print { display:none; } }
+        @media print { body { padding:0; background:#fff; } .inv { box-shadow:none; max-width:100%; } .no-print { display:none; } }
     </style>
     </head><body>
     <div class="inv">
         <div class="inv-inner">
             <div class="brand">
-                <img src="../pic/alhafiz.jpeg" alt="Logo" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:10px;border:2px solid #095D3B;">
+                <img src="../pic/alhafiz.jpeg" alt="Logo">
                 <h1><?php echo COMPANY_NAME; ?></h1>
                 <div class="tagline">EV Scooties &amp; Electric Motorcycles</div>
                 <div class="meta">
@@ -235,19 +250,15 @@ if (isset($_GET['print_order'])) {
                 <div class="sec-body" style="padding:0;">
                     <table class="items">
                         <tr>
-                            <th>#</th><th>Bike</th><th>Chassis No</th><th>Motor No</th><th>Battery No</th><th>Charger No</th><th class="text-end">Purchase</th><th class="text-end">Sale</th><th>Status</th>
+                            <th>#</th><th>Bike</th><th class="text-end" style="text-align:right;">Qty</th><th class="text-end" style="text-align:right;">Purchase Price</th><th class="text-end" style="text-align:right;">Total</th>
                         </tr>
-                        <?php $i = 1; foreach ($stockItems as $bs): ?>
+                        <?php $i = 1; foreach ($grouped as $g): ?>
                         <tr>
                             <td><?php echo $i++; ?></td>
-                            <td class="bike-name"><?php echo e(trim($bs['bname'] . ' ' . $bs['mname'] . ' ' . $bs['vname'] . ($bs['color'] ? ' [' . $bs['color'] . ']' : ''))); ?></td>
-                            <td><?php echo e($bs['chassis_no'] ?: '-'); ?></td>
-                            <td><?php echo e($bs['motor_no'] ?: '-'); ?></td>
-                            <td><?php echo e($bs['battery_serial'] ?: '-'); ?></td>
-                            <td><?php echo e($bs['charger_serial'] ?: '-'); ?></td>
-                            <td class="text-end"><?php echo formatMoney($bs['purchase_price']); ?></td>
-                            <td class="text-end"><?php echo formatMoney($bs['sale_price']); ?></td>
-                            <td><span class="st st-<?php echo $bs['status']; ?>"><?php echo ucfirst(str_replace('_', ' ', $bs['status'])); ?></span></td>
+                            <td class="bike-name"><?php echo e($g['name']); ?></td>
+                            <td class="text-end" style="text-align:right;"><?php echo $g['qty']; ?></td>
+                            <td class="text-end" style="text-align:right;"><?php echo formatMoney($g['purchase_price']); ?></td>
+                            <td class="text-end" style="text-align:right;"><?php echo formatMoney($g['total']); ?></td>
                         </tr>
                         <?php endforeach; ?>
                     </table>
@@ -272,15 +283,15 @@ if (isset($_GET['print_order'])) {
             <?php if (!empty($po['notes'])): ?>
             <div class="sec">
                 <div class="sec-bar">Notes</div>
-                <div class="sec-body"><div class="notes" style="font-size:10.5px;color:#444;white-space:pre-line;"><?php echo e($po['notes']); ?></div></div>
+                <div class="sec-body"><div class="notes"><?php echo e($po['notes']); ?></div></div>
             </div>
             <?php endif; ?>
         </div>
-        <div class="foot"><?php echo COMPANY_NAME; ?> — Purchase Order <?php echo e($po['invoice_no']); ?></div>
+        <div class="foot">Thank you for shopping with <?php echo COMPANY_NAME; ?></div>
     </div>
     <div class="no-print">
         <button onclick="window.print()" class="btn-primary"><i class="bi bi-printer"></i> Print</button>
-        <button onclick="window.close()" class="btn-secondary">Close</button>
+        <a href="purchase_view.php" class="btn-secondary">Close</a>
     </div>
     </body></html>
     <?php exit;
@@ -289,7 +300,7 @@ if (isset($_GET['print_order'])) {
 $result = $pdo->query("SELECT p.*, s.name as sname,
     (SELECT COUNT(*) FROM bike_stock bs WHERE bs.purchase_id=p.id AND bs.status='ordered') as ordered_qty,
     (SELECT COUNT(*) FROM bike_stock bs WHERE bs.purchase_id=p.id AND bs.status='in_stock') as received_qty,
-    (SELECT GROUP_CONCAT(DISTINCT CONCAT(b.name, ' ', m.name, ' ', v.name, IF(bs.chassis_no IS NULL OR bs.chassis_no='', '', CONCAT(' (', bs.chassis_no, ')'))) SEPARATOR '<br>')
+    (SELECT GROUP_CONCAT(DISTINCT CONCAT(b.name, ' ', m.name, ' ', v.name, IF(v.color IS NULL OR v.color='', '', CONCAT(' [', v.color, ']'))) SEPARATOR '<br>')
      FROM bike_stock bs JOIN bike_variants v ON bs.variant_id=v.id JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id
      WHERE bs.purchase_id=p.id) as bikes
     FROM purchases p LEFT JOIN suppliers s ON p.supplier_id=s.id ORDER BY p.id DESC");
@@ -384,7 +395,7 @@ require_once '../includes/sidebar.php';
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive p-3">
-                    <table class="table table-hover" id="purchaseTable">
+                    <table class="table table-hover" id="purchaseTable" data-skip-dt>
                         <thead>
                             <tr>
                                 <th>Invoice</th>
@@ -504,6 +515,12 @@ require_once '../includes/sidebar.php';
     </div>
 
 <script>
+$(document).ready(function() {
+    $('#purchaseTable').DataTable({
+        pageLength: 25,
+        language: { search: "Search (Invoice, Supplier, Bike name):", lengthMenu: "Show _MENU_ entries" }
+    });
+});
 var detailsModalInstance = null;
 
 function viewDetails(id) {

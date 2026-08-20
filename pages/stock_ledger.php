@@ -7,7 +7,7 @@ $showSidebar = true; $base_path = '../';
 $search = $_GET['search'] ?? '';
 
 $query = "SELECT s.id, s.chassis_no, s.motor_no, s.battery_serial, s.charger_serial, s.status, s.created_at,
-          v.name as vname, m.name as mname, b.name as bname,
+          v.name as vname, v.color, m.name as mname, b.name as bname,
           p.invoice_no as purchase_invoice, p.purchase_date,
           sl.invoice_no as sale_invoice, sl.sale_date
           FROM bike_stock s
@@ -65,7 +65,7 @@ if (isset($_GET['print'])) {
             <?php $i = 1; foreach ($rows as $r): ?>
             <tr>
                 <td class="text-muted"><?php echo $i++; ?></td>
-                <td><?php echo e($r['bname'] . ' ' . $r['mname'] . ' ' . $r['vname']); ?></td>
+                <td><?php echo e($r['bname'] . ' ' . $r['mname'] . ' ' . $r['vname'] . ($r['color'] ? ' [' . $r['color'] . ']' : '')); ?></td>
                 <td><strong><?php echo e($r['chassis_no']); ?></strong></td>
                 <td><?php echo e($r['motor_no'] ?: '-'); ?></td>
                 <td><?php echo e($r['battery_serial'] ?: '-'); ?></td>
@@ -129,7 +129,7 @@ require_once '../includes/sidebar.php';
 <?php $i = 1; foreach ($rows as $r): ?>
     <tr>
         <td class="text-muted"><?php echo $i++; ?></td>
-        <td><?php echo e($r['bname'] . ' ' . $r['mname'] . ' ' . $r['vname']); ?></td>
+        <td><?php echo e($r['bname'] . ' ' . $r['mname'] . ' ' . $r['vname'] . ($r['color'] ? ' [' . $r['color'] . ']' : '')); ?></td>
         <td class="fw-semibold"><?php echo e($r['chassis_no']); ?></td>
         <td><?php echo e($r['motor_no'] ?: '-'); ?></td>
         <td><?php echo e($r['battery_serial'] ?: '-'); ?></td>

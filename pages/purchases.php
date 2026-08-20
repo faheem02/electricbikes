@@ -94,7 +94,7 @@ if (isset($_GET['delete'])) {
     header("Location: $loc"); exit;
 }
 
-$variants = $pdo->query("SELECT v.id, v.name, v.purchase_price, v.sale_price, m.name as mname, b.name as bname FROM bike_variants v JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id ORDER BY b.name, m.name, v.name");
+$variants = $pdo->query("SELECT v.id, v.name, v.color, v.purchase_price, v.sale_price, m.name as mname, b.name as bname FROM bike_variants v JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id ORDER BY b.name, m.name, v.name");
 $purchaseInvNo = nextInvoiceNo($pdo, 'PUR-', 'purchases');
 
 require_once '../includes/header.php';
@@ -153,6 +153,7 @@ require_once '../includes/sidebar.php';
                                 <tr>
                                     <th>#</th>
                                     <th style="min-width:160px;">Variant</th>
+                                    <th style="width:90px;">Color</th>
                                     <th style="width:70px;">Qty</th>
                                     <th style="width:110px;">Purchase Price</th>
                                     <th style="width:100px;">Sale Price</th>
@@ -166,10 +167,16 @@ require_once '../includes/sidebar.php';
                                         <select name="variant_id[]" class="form-select form-select-sm variant-select" required>
                                             <option value="">Select Variant</option>
                                             <?php $variants->execute(); while ($v = $variants->fetch(PDO::FETCH_ASSOC)): ?>
-                                                <option value="<?php echo $v['id']; ?>" data-purchase="<?php echo $v['purchase_price']; ?>" data-sale="<?php echo $v['sale_price']; ?>"><?php echo e($v['bname'] . ' ' . $v['mname'] . ' - ' . $v['name']); ?></option>
+                                                <option value="<?php echo $v['id']; ?>"
+                                                    data-purchase="<?php echo $v['purchase_price']; ?>"
+                                                    data-sale="<?php echo $v['sale_price']; ?>"
+                                                    data-color="<?php echo e($v['color'] ?? ''); ?>">
+                                                    <?php echo e($v['bname'] . ' ' . $v['mname'] . ' - ' . $v['name'] . ($v['color'] ? ' [' . $v['color'] . ']' : '')); ?>
+                                                </option>
                                             <?php endwhile; ?>
                                         </select>
                                     </td>
+                                    <td><span class="color-badge badge bg-secondary" style="display:none;"></span><span class="color-empty text-muted small">-</span></td>
                                     <td><input type="number" name="qty[]" class="form-control form-control-sm qty-input" min="1" value="1" required></td>
                                     <td><input type="number" step="0.01" name="purchase_price[]" class="form-control form-control-sm purchase-input" min="0" required placeholder="0"></td>
                                     <td><input type="number" step="0.01" name="sale_price[]" class="form-control form-control-sm" placeholder="0"></td>
@@ -211,6 +218,18 @@ document.querySelector('#itemsTable tbody').addEventListener('change', function(
         var row = e.target.closest('tr');
         row.querySelector('.purchase-input').value = opt.getAttribute('data-purchase') || 0;
         row.querySelector('input[name="sale_price[]"]').value = opt.getAttribute('data-sale') || 0;
+        // Update color badge
+        var color = opt.getAttribute('data-color') || '';
+        var badge = row.querySelector('.color-badge');
+        var empty = row.querySelector('.color-empty');
+        if (color) {
+            badge.textContent = color;
+            badge.style.display = 'inline-block';
+            empty.style.display = 'none';
+        } else {
+            badge.style.display = 'none';
+            empty.style.display = 'inline';
+        }
         calcTotal();
     }
 });
@@ -218,6 +237,12 @@ function addRow() {
     var tbody = document.querySelector('#itemsTable tbody');
     var row = tbody.querySelector('tr').cloneNode(true);
     row.querySelectorAll('input').forEach(function(e) { e.value = e.classList.contains('qty-input') ? '1' : ''; });
+    row.querySelector('.variant-select').selectedIndex = 0;
+    var badge = row.querySelector('.color-badge');
+    var empty = row.querySelector('.color-empty');
+    badge.style.display = 'none';
+    badge.textContent = '';
+    empty.style.display = 'inline';
     tbody.appendChild(row);
     renumber();
 }
