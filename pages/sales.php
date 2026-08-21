@@ -5,7 +5,7 @@ requireLogin();
 $showSidebar = true; $base_path = '../';
 
 $customers = $pdo->query("SELECT * FROM customers ORDER BY name");
-$variants = $pdo->query("SELECT v.id as vid, v.name as vname, v.sale_price as variant_sale, v.purchase_price as variant_purchase, m.name as mname, b.name as bname, COUNT(s.id) as bike_count FROM bike_variants v JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id JOIN bike_stock s ON s.variant_id=v.id WHERE s.status='in_stock' GROUP BY v.id ORDER BY b.name, m.name, v.name");
+$variants = $pdo->query("SELECT v.id as vid, v.name as vname, v.color as vcolor, v.sale_price as variant_sale, v.purchase_price as variant_purchase, m.name as mname, b.name as bname, COUNT(s.id) as bike_count FROM bike_variants v JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id JOIN bike_stock s ON s.variant_id=v.id WHERE s.status='in_stock' GROUP BY v.id ORDER BY b.name, m.name, v.name");
 
 $invPrefix = getSetting($pdo, 'invoice_prefix') ?: 'INV-';
 $invNo = nextInvoiceNo($pdo, $invPrefix);
@@ -288,10 +288,10 @@ require_once '../includes/sidebar.php';
                         <table class="table table-borderless mb-0" id="itemsTable">
                             <thead class="table-light">
                                 <tr>
-                                    <th style="width:30%;" class="ps-4">Variant</th>
-                                    <th style="width:40%;">Select Bike</th>
-                                    <th style="width:20%;">Sale Price</th>
-                                    <th style="width:5%;"></th>
+                                    <th class="ps-4">Variant</th>
+                                    <th>Select Bike</th>
+                                    <th style="width:180px;">Sale Price</th>
+                                    <th style="width:40px;"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -300,7 +300,7 @@ require_once '../includes/sidebar.php';
                                         <select name="variant_id[]" class="form-select variant-select" required>
                                             <option value="">Select Variant</option>
                                             <?php $variants->execute(); while ($v = $variants->fetch(PDO::FETCH_ASSOC)): ?>
-                                                <option value="<?php echo $v['vid']; ?>" data-price="<?php echo $v['variant_sale'] ?: $v['variant_purchase']; ?>"><?php echo e($v['bname'] . ' ' . $v['mname'] . ' - ' . $v['vname']); ?> (<?php echo $v['bike_count']; ?>)</option>
+                                                <option value="<?php echo $v['vid']; ?>" data-price="<?php echo $v['variant_sale'] ?: $v['variant_purchase']; ?>"><?php echo e($v['bname'] . ' ' . $v['mname'] . ' - ' . $v['vname'] . ($v['vcolor'] ? ' (' . $v['vcolor'] . ')' : '') . ' (' . $v['bike_count'] . ')'); ?></option>
                                             <?php endwhile; ?>
                                         </select>
                                     </td>
@@ -308,6 +308,14 @@ require_once '../includes/sidebar.php';
                                         <select name="stock_id[]" class="form-select bike-select" required disabled>
                                             <option value="">-- Select variant first --</option>
                                         </select>
+                                        <div class="bike-info mt-2" style="display:none; font-size:0.82rem; background:#f8f9fa; border-radius:6px; padding:7px 10px; border:1px solid #dee2e6;">
+                                            <div class="row g-1">
+                                                <div class="col-6"><span class="text-muted">Chassis:</span> <strong class="info-chassis">-</strong></div>
+                                                <div class="col-6"><span class="text-muted">Motor:</span> <strong class="info-motor">-</strong></div>
+                                                <div class="col-6"><span class="text-muted">Battery:</span> <strong class="info-battery">-</strong></div>
+                                                <div class="col-6"><span class="text-muted">Charger:</span> <strong class="info-charger">-</strong></div>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td><input type="number" step="0.01" name="sale_price[]" class="form-control salePrice" placeholder="Enter price" oninput="calcTotal()" required></td>
                                     <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
@@ -375,6 +383,10 @@ require_once '../includes/sidebar.php';
         </div>
     </div>
 
+<style>
+.bike-select { min-width: 100% !important; }
+.variant-select option { white-space: nowrap; }
+</style>
 <script>
 function calcTotal() {
     var total = 0;
@@ -401,35 +413,56 @@ document.getElementById('itemsTable').addEventListener('change', function(e) {
     if (e.target.classList.contains('variant-select')) {
         var row = e.target.closest('tr');
         var bikeSel = row.querySelector('.bike-select');
+        var bikeInfo = row.querySelector('.bike-info');
         var variantId = e.target.value;
         if (!variantId) {
             bikeSel.innerHTML = '<option value="">-- Select variant first --</option>';
             bikeSel.disabled = true;
+            bikeInfo.style.display = 'none';
             return;
         }
         bikeSel.innerHTML = '<option value="">Loading...</option>';
         bikeSel.disabled = true;
+        bikeInfo.style.display = 'none';
         fetch('stock_get.php?variant_id=' + variantId)
             .then(function(r) { return r.json(); })
             .then(function(bikes) {
                 var html = '<option value="">-- Select bike (' + bikes.length + ' available) --</option>';
                 bikes.forEach(function(b) {
-                    var label = (b.chassis_no || 'N/A');
-                    if (b.motor_no) label += ' | Motor: ' + b.motor_no;
-                    if (b.battery_serial) label += ' | Battery: ' + b.battery_serial;
-                    if (b.charger_serial) label += ' | Charger: ' + b.charger_serial;
-                    html += '<option value="' + b.id + '" data-price="' + (b.sale_price || 0) + '">' + label + '</option>';
+                    var label = 'Chassis: ' + (b.chassis_no || 'No Chassis');
+                    html += '<option value="' + b.id + '"'
+                        + ' data-price="' + (b.sale_price || 0) + '"'
+                        + ' data-chassis="' + (b.chassis_no || '-') + '"'
+                        + ' data-motor="' + (b.motor_no || '-') + '"'
+                        + ' data-battery="' + (b.battery_serial || '-') + '"'
+                        + ' data-charger="' + (b.charger_serial || '-') + '"'
+                        + '>' + label + '</option>';
                 });
                 bikeSel.innerHTML = html;
+                bikeSel.disabled = false;
+            })
+            .catch(function() {
+                bikeSel.innerHTML = '<option value="">-- Failed to load bikes --</option>';
                 bikeSel.disabled = false;
             });
     }
     if (e.target.classList.contains('bike-select')) {
         var row = e.target.closest('tr');
         var opt = e.target.options[e.target.selectedIndex];
+        var bikeInfo = row.querySelector('.bike-info');
         var price = parseFloat(opt.getAttribute('data-price')) || 0;
         if (price > 0 && (!row.querySelector('.salePrice').value || row.querySelector('.salePrice').value == 0)) {
             row.querySelector('.salePrice').value = price;
+        }
+        // Update info card
+        if (e.target.value) {
+            row.querySelector('.info-chassis').textContent  = opt.getAttribute('data-chassis')  || '-';
+            row.querySelector('.info-motor').textContent    = opt.getAttribute('data-motor')    || '-';
+            row.querySelector('.info-battery').textContent  = opt.getAttribute('data-battery')  || '-';
+            row.querySelector('.info-charger').textContent  = opt.getAttribute('data-charger')  || '-';
+            bikeInfo.style.display = 'block';
+        } else {
+            bikeInfo.style.display = 'none';
         }
         calcTotal();
     }
@@ -451,6 +484,7 @@ function addRow() {
     row.querySelectorAll('input').forEach(function(e) { e.value = ''; });
     row.querySelector('.bike-select').innerHTML = '<option value="">-- Select variant first --</option>';
     row.querySelector('.bike-select').disabled = true;
+    row.querySelector('.bike-info').style.display = 'none';
     var variantSel = row.querySelector('.variant-select');
     variantSel.selectedIndex = 0;
     tbody.appendChild(row);

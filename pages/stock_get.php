@@ -1,7 +1,11 @@
 <?php
+ob_start();
 require_once '../includes/database.php';
 require_once '../includes/auth.php';
+ob_end_clean();
 requireLogin();
+
+header('Content-Type: application/json');
 
 $variantId = intval($_GET['variant_id'] ?? 0);
 if (!$variantId) { echo json_encode([]); exit; }

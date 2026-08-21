@@ -30,17 +30,30 @@ if (isset($_GET['delete_variant'])) {
 
 if (isset($_GET['delete_stock'])) {
     $stockId = intval($_GET['delete_stock']);
-    $variantId = intval($_GET['variant_id'] ?? 0);
     $row = $pdo->prepare("SELECT chassis_no, status FROM bike_stock WHERE id=?");
     $row->execute([$stockId]);
     $unit = $row->fetch(PDO::FETCH_ASSOC);
     if ($unit && in_array($unit['status'], ['sold', 'booked'])) {
-        // Cannot delete sold/booked units — return JSON error for AJAX
         echo json_encode(['error' => 'Cannot delete a unit that is sold or booked.']);
         exit;
     }
     $pdo->prepare("DELETE FROM bike_stock WHERE id=?")->execute([$stockId]);
     logActivity($pdo, 'Stock Unit Deleted', "bike_stock #$stockId chassis: " . ($unit['chassis_no'] ?: 'N/A'));
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_stock'])) {
+    $stockId = intval($_POST['stock_id']);
+    $chassis = trim($_POST['chassis_no']);
+    $motor = trim($_POST['motor_no']);
+    $battery = trim($_POST['battery_serial']);
+    $charger = trim($_POST['charger_serial']);
+    $purchase = floatval($_POST['purchase_price']);
+    $sale = floatval($_POST['sale_price']);
+    $pdo->prepare("UPDATE bike_stock SET chassis_no=?, motor_no=?, battery_serial=?, charger_serial=?, purchase_price=?, sale_price=? WHERE id=?")
+        ->execute([$chassis ?: null, $motor ?: null, $battery ?: null, $charger ?: null, $purchase, $sale, $stockId]);
+    logActivity($pdo, 'Stock Unit Updated', "bike_stock #$stockId chassis: " . ($chassis ?: 'N/A'));
     echo json_encode(['success' => true]);
     exit;
 }
@@ -141,7 +154,56 @@ require_once '../includes/sidebar.php';
         </div>
     </div>
 
-    <!-- Edit Modal -->
+    <!-- Edit Stock Unit Modal -->
+    <div class="modal fade" id="editStockModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Edit Stock Unit</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editStockForm">
+                    <div class="modal-body">
+                        <?php echo csrfField(); ?>
+                        <input type="hidden" name="stock_id" id="editStockId">
+                        <input type="hidden" name="update_stock" value="1">
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">Chassis No</label>
+                            <input type="text" name="chassis_no" id="editStockChassis" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">Motor No</label>
+                            <input type="text" name="motor_no" id="editStockMotor" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">Battery Serial</label>
+                            <input type="text" name="battery_serial" id="editStockBattery" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">Charger Serial</label>
+                            <input type="text" name="charger_serial" id="editStockCharger" class="form-control">
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-0">
+                                <label class="form-label fw-medium">Purchase Price</label>
+                                <input type="number" step="0.01" name="purchase_price" id="editStockPurchase" class="form-control" required>
+                            </div>
+                            <div class="col-6 mb-0">
+                                <label class="form-label fw-medium">Sale Price</label>
+                                <input type="number" step="0.01" name="sale_price" id="editStockSale" class="form-control" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-lg me-1"></i>Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Variant Modal -->
     <div class="modal fade" id="editModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -179,7 +241,9 @@ require_once '../includes/sidebar.php';
         </div>
     </div>
 <script>
+var currentViewVariant = null;
 function viewProduct(id) {
+    currentViewVariant = id;
     var body = document.getElementById('viewBody');
     body.innerHTML = '<div class="text-center text-muted py-3">Loading...</div>';
     new bootstrap.Modal(document.getElementById('viewModal')).show();
@@ -199,5 +263,64 @@ function editProduct(id) {
     document.getElementById('editSale').value = p.sale_price;
     new bootstrap.Modal(document.getElementById('editModal')).show();
 }
+
+function deleteStockUnit(stockId, chassis) {
+    Swal.fire({
+        title: 'Delete Stock Unit?',
+        html: 'Chassis: <strong>' + chassis + '</strong><br>This action cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel'
+    }).then(function(result) {
+        if (!result.isConfirmed) return;
+        fetch('products.php?delete_stock=' + stockId)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    Swal.fire('Error', data.error, 'error');
+                } else {
+                    var row = document.getElementById('stock-row-' + stockId);
+                    if (row) row.remove();
+                    Swal.fire({ title: 'Deleted!', text: 'Stock unit removed.', icon: 'success', timer: 1500, showConfirmButton: false });
+                }
+            })
+            .catch(function() { Swal.fire('Error', 'Failed to delete unit.', 'error'); });
+    });
+}
+
+function editStockUnit(id, chassis, motor, battery, charger, purchasePrice, salePrice, status) {
+    document.getElementById('editStockId').value = id;
+    document.getElementById('editStockChassis').value = chassis || '';
+    document.getElementById('editStockMotor').value = motor || '';
+    document.getElementById('editStockBattery').value = battery || '';
+    document.getElementById('editStockCharger').value = charger || '';
+    document.getElementById('editStockPurchase').value = purchasePrice || '';
+    document.getElementById('editStockSale').value = salePrice || '';
+    document.getElementById('editStockChassis').removeAttribute('required');
+    var chassisRequired = document.querySelector('.chassis-required');
+    if (chassisRequired) chassisRequired.style.display = 'none';
+    new bootstrap.Modal(document.getElementById('editStockModal')).show();
+}
+
+document.getElementById('editStockForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var form = this;
+    var data = new FormData(form);
+    fetch('products.php', { method: 'POST', body: data })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.error) {
+                Swal.fire('Error', res.error, 'error');
+            } else {
+                Swal.fire({ title: 'Updated!', text: 'Stock unit updated.', icon: 'success', timer: 1500, showConfirmButton: false });
+                bootstrap.Modal.getInstance(document.getElementById('editStockModal')).hide();
+                if (currentViewVariant) viewProduct(currentViewVariant);
+            }
+        })
+        .catch(function() { Swal.fire('Error', 'Failed to update unit.', 'error'); });
+});
 </script>
 <?php require_once '../includes/footer.php'; ?>
