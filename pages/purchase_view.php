@@ -96,6 +96,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive_all_submit'])
     }
 }
 
+// Edit received bike serial numbers (POST)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_stock'])) {
+    $bid = intval($_POST['edit_id']);
+    $chassis = trim($_POST['chassis_no'] ?? '');
+    $motor = trim($_POST['motor_no'] ?? '');
+    $battery = trim($_POST['battery_serial'] ?? '');
+    $charger = trim($_POST['charger_serial'] ?? '');
+
+    if ($chassis === '') {
+        $err = 'Chassis number is required.';
+    } else {
+        try {
+            $pdo->prepare("UPDATE bike_stock SET chassis_no=?, motor_no=NULLIF(?,''), battery_serial=NULLIF(?,''), charger_serial=NULLIF(?,'') WHERE id=? AND status IN ('in_stock','sold','booked')")
+                ->execute([$chassis, $motor, $battery, $charger, $bid]);
+            logActivity($pdo, 'Edit Stock', "bike_stock #$bid serials updated, Chassis: $chassis");
+            header('Location: purchase_view.php'); exit;
+        } catch (PDOException $e) {
+            if ($e->getCode() == 23000) {
+                $err = 'Duplicate serial number! Chassis, Motor, Battery, or Charger already exists.';
+            } else {
+                throw $e;
+            }
+        }
+    }
+}
+
+// Delete a bike from a purchase (GET) — also removes it from its sale if sold/booked
+if (isset($_GET['delete_stock'])) {
+    $bid = intval($_GET['delete_stock']);
+    $st = $pdo->prepare("SELECT purchase_id, status, sale_id FROM bike_stock WHERE id=? AND status IN ('in_stock','sold','booked','damaged')");
+    $st->execute([$bid]);
+    $bs = $st->fetch(PDO::FETCH_ASSOC);
+    if ($bs) {
+        $pid = $bs['purchase_id'];
+        if (!empty($bs['sale_id'])) {
+            // Bike belongs to a sale — remove it from the sale and recalculate
+            $sid = intval($bs['sale_id']);
+            $cnt = $pdo->prepare("SELECT COUNT(*) FROM sale_items WHERE sale_id=?");
+            $cnt->execute([$sid]);
+            if ($cnt->fetchColumn() <= 1) {
+                $err = 'Cannot delete: this bike is the only item in its sale. Delete the sale from Sale List first.';
+            } else {
+                $invStmt = $pdo->prepare("SELECT invoice_no FROM sales WHERE id=?");
+                $invStmt->execute([$sid]);
+                $invNo = $invStmt->fetchColumn();
+                $pdo->prepare("DELETE FROM sale_items WHERE stock_id=? AND sale_id=?")->execute([$bid, $sid]);
+                $pdo->prepare("DELETE FROM bike_stock WHERE id=?")->execute([$bid]);
+                rebuildSaleLedger($pdo, $sid);
+                logActivity($pdo, 'Delete Stock', "Purchase #$pid, Deleted bike_stock #$bid, removed from sale #$sid ($invNo)");
+            }
+        } else {
+            $pdo->prepare("DELETE FROM bike_stock WHERE id=?")->execute([$bid]);
+            if ($pid) {
+                $total = $pdo->prepare("SELECT COUNT(*) FROM bike_stock WHERE purchase_id=? AND status IN ('ordered','in_stock')");
+                $total->execute([$pid]);
+                $total = $total->fetchColumn();
+                $received = $pdo->prepare("SELECT COUNT(*) FROM bike_stock WHERE purchase_id=? AND status='in_stock'");
+                $received->execute([$pid]);
+                $received = $received->fetchColumn();
+                $newStatus = ($total > 0 && $received >= $total) ? 'completed' : ($received > 0 ? 'partial' : 'ordered');
+                $pdo->prepare("UPDATE purchases SET status=? WHERE id=?")->execute([$newStatus, $pid]);
+                logActivity($pdo, 'Delete Stock', "Purchase #$pid, Deleted bike_stock #$bid");
+            }
+        }
+        if (empty($err)) { header('Location: purchase_view.php'); exit; }
+    } else {
+        header('Location: purchase_view.php'); exit;
+    }
+}
+
 // Receive a single bike stock (GET - legacy fallback)
 if (isset($_GET['receive'])) {
     $bid = intval($_GET['receive']);
@@ -499,6 +569,45 @@ require_once '../includes/sidebar.php';
         </div>
     </div>
 
+    <!-- Edit Received Bike Modal -->
+    <div class="modal fade" id="editStockModal" tabindex="-1">
+        <div class="modal-dialog">
+            <form method="POST" action="purchase_view.php">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h6 class="modal-title"><i class="bi bi-pencil-square me-1"></i>Edit Bike Serials</h6>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <?php echo csrfField(); ?>
+                        <input type="hidden" name="edit_id" id="edit_id">
+                        <p class="mb-3"><strong id="editBikeName"></strong></p>
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Chassis No <span class="text-danger">*</span></label>
+                            <input type="text" name="chassis_no" id="edit_chassis_no" class="form-control" required placeholder="Enter chassis number">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Motor No</label>
+                            <input type="text" name="motor_no" id="edit_motor_no" class="form-control" placeholder="Enter motor number">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Battery Serial</label>
+                            <input type="text" name="battery_serial" id="edit_battery_serial" class="form-control" placeholder="Enter battery serial">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Charger Serial</label>
+                            <input type="text" name="charger_serial" id="edit_charger_serial" class="form-control" placeholder="Enter charger serial">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" name="edit_stock" value="1" class="btn btn-primary btn-sm"><i class="bi bi-check-lg"></i> Update</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Receive All Modal (top-level, not nested) -->
     <div class="modal fade" id="receiveAllModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
@@ -529,7 +638,7 @@ function viewDetails(id) {
     detailsModalInstance = new bootstrap.Modal(document.getElementById('detailsModal'));
     detailsModalInstance.show();
 
-    fetch('purchase_details.php?id=' + id)
+    fetch('purchase_details.php?id=' + id + '&t=' + new Date().getTime())
         .then(function(r) { return r.text(); })
         .then(function(html) { body.innerHTML = html; })
         .catch(function() { body.innerHTML = '<div class="alert alert-danger">Failed to load details.</div>'; });
@@ -540,6 +649,18 @@ function openReceiveModal(id, name) {
     document.getElementById('receive_id').value = id;
     document.getElementById('receiveBikeName').textContent = name;
     var m = new bootstrap.Modal(document.getElementById('receiveModal'));
+    m.show();
+}
+
+function openEditStockModal(btn) {
+    if (detailsModalInstance) { detailsModalInstance.hide(); }
+    document.getElementById('edit_id').value = btn.getAttribute('data-id');
+    document.getElementById('editBikeName').textContent = btn.getAttribute('data-name');
+    document.getElementById('edit_chassis_no').value = btn.getAttribute('data-chassis') || '';
+    document.getElementById('edit_motor_no').value = btn.getAttribute('data-motor') || '';
+    document.getElementById('edit_battery_serial').value = btn.getAttribute('data-battery') || '';
+    document.getElementById('edit_charger_serial').value = btn.getAttribute('data-charger') || '';
+    var m = new bootstrap.Modal(document.getElementById('editStockModal'));
     m.show();
 }
 

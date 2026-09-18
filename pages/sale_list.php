@@ -16,6 +16,7 @@ if (isset($_GET['deliver'])) {
         header('Location: sale_list.php?error=Collect remaining amount first'); exit;
     }
     $pdo->prepare("UPDATE bike_stock SET status='sold' WHERE sale_id=? AND status='booked'")->execute([$sid]);
+    $pdo->prepare("UPDATE sales SET sale_type='cash' WHERE id=? AND sale_type='booking'")->execute([$sid]);
     logActivity($pdo, 'Complete Delivery', "Sale #$sid delivery completed");
     header('Location: sale_list.php'); exit;
 }
@@ -130,8 +131,8 @@ require_once '../includes/sidebar.php';
                                 <td><span class="badge bg-<?php echo $r['payment_status']=='paid'?'success':($r['payment_status']=='partial'?'warning text-dark':'danger'); ?>"><?php echo ucfirst($r['payment_status']); ?></span></td>
 <td class="text-nowrap">
     <div class="d-flex gap-1">
+        <button type="button" class="btn btn-sm btn-outline-primary" onclick="viewSale(<?php echo $r['id']; ?>)" title="View Details"><i class="bi bi-eye"></i></button>
         <a href="sales.php?print=<?php echo $r['id']; ?>" target="_blank" class="btn btn-sm btn-outline-info" title="Print Invoice"><i class="bi bi-printer"></i></a>
-        <a href="sales.php?edit=<?php echo $r['id']; ?>" class="btn btn-sm btn-outline-primary" title="Edit Sale"><i class="bi bi-pencil"></i></a>
         <?php if ($hasBooked): ?>
             <a href="sale_list.php?deliver=<?php echo $r['id']; ?>" class="btn btn-sm btn-success" onclick="return confirm('Mark this booking as delivered?')" title="Complete Delivery"><i class="bi bi-check-circle"></i></a>
         <?php endif; ?>
@@ -146,4 +147,93 @@ require_once '../includes/sidebar.php';
             </div>
         </div>
     </div>
+
+    <!-- Sale Details Modal -->
+    <div class="modal fade" id="saleDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-receipt me-2"></i>Sale Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="saleDetailsBody">
+                    <div class="text-center text-muted py-3">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Sale Item Modal -->
+    <div class="modal fade" id="editItemModal" tabindex="-1">
+        <div class="modal-dialog">
+            <form method="POST" action="sales.php">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h6 class="modal-title"><i class="bi bi-pencil-square me-1"></i>Edit Sale Bike</h6>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <?php echo csrfField(); ?>
+                        <input type="hidden" name="update_item" value="1">
+                        <input type="hidden" name="item_id" id="ei_item_id">
+                        <input type="hidden" name="sale_id" id="ei_sale_id">
+                        <input type="hidden" name="back" value="sale_list.php">
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Bike</label>
+                            <select name="stock_id" id="ei_stock" class="form-select" required></select>
+                            <div class="bike-info mt-2" style="display:none; font-size:0.82rem; background:#f8f9fa; border-radius:6px; padding:7px 10px; border:1px solid #dee2e6;">
+                                <span class="text-muted">Selected:</span> <strong id="ei_label">-</strong>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Sale Price</label>
+                            <input type="number" step="0.01" name="sale_price" id="ei_price" class="form-control" required placeholder="Enter price">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check-lg"></i> Update</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+<script>
+var saleDetailsModalInstance = null;
+function viewSale(id) {
+    var body = document.getElementById('saleDetailsBody');
+    body.innerHTML = '<div class="text-center text-muted py-3">Loading...</div>';
+    saleDetailsModalInstance = new bootstrap.Modal(document.getElementById('saleDetailsModal'));
+    saleDetailsModalInstance.show();
+    fetch('sale_details.php?id=' + id + '&t=' + new Date().getTime())
+        .then(function(r) { return r.text(); })
+        .then(function(html) { body.innerHTML = html; })
+        .catch(function() { body.innerHTML = '<div class="alert alert-danger">Failed to load details.</div>'; });
+}
+
+function openEditSaleItem(btn) {
+    document.getElementById('ei_item_id').value = btn.getAttribute('data-item-id');
+    document.getElementById('ei_sale_id').value = btn.getAttribute('data-sale-id');
+    var sel = document.getElementById('ei_stock');
+    var opts = JSON.parse(btn.getAttribute('data-options') || '[]');
+    sel.innerHTML = '';
+    opts.forEach(function(o) {
+        var opt = document.createElement('option');
+        opt.value = o.id;
+        opt.textContent = o.label;
+        opt.setAttribute('data-price', o.price);
+        sel.appendChild(opt);
+    });
+    sel.value = btn.getAttribute('data-stock-id');
+    document.getElementById('ei_price').value = btn.getAttribute('data-price');
+    var m = new bootstrap.Modal(document.getElementById('editItemModal'));
+    m.show();
+}
+document.getElementById('ei_stock').addEventListener('change', function() {
+    var opt = this.options[this.selectedIndex];
+    var p = parseFloat(opt.getAttribute('data-price')) || 0;
+    if (p > 0) { document.getElementById('ei_price').value = p; }
+});
+</script>
 <?php require_once '../includes/footer.php'; ?>

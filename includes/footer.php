@@ -10,6 +10,11 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 $(document).ready(function () {
+    $('table.table:has(thead):not([data-skip-dt])').each(function () {
+        if (!$(this).closest('.table-responsive').length) {
+            $(this).wrap('<div class="table-responsive"></div>');
+        }
+    });
     $('table.table:has(thead):not([data-skip-dt])').DataTable({
         pageLength: 25,
         language: { search: "Search:", lengthMenu: "Show _MENU_ entries" }

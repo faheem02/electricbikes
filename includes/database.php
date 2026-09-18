@@ -263,6 +263,17 @@ $colAdd('purchase_items', 'variant_id', 'INT AFTER purchase_id');
 $colAdd('purchase_items', 'cost_price', 'DECIMAL(12,2) DEFAULT 0.00 AFTER qty');
 $colAdd('purchase_items', 'total', 'DECIMAL(12,2) DEFAULT 0.00 AFTER cost_price');
 $colAdd('expenses', 'paid_by', 'VARCHAR(100) AFTER date');
+$colAdd('customer_ledger', 'sale_id', 'INT AFTER customer_id');
+$colAdd('cash_book', 'sale_id', 'INT AFTER balance');
+$colAdd('bank_book', 'sale_id', 'INT AFTER balance');
+
+// Convert already-delivered bookings (bikes sold, none booked) to cash so type reflects delivery
+try {
+    $pdo->exec("UPDATE sales s SET s.sale_type='cash'
+        WHERE s.sale_type='booking'
+        AND s.id IN (SELECT DISTINCT sale_id FROM bike_stock WHERE status='sold' AND sale_id IS NOT NULL)
+        AND s.id NOT IN (SELECT DISTINCT sale_id FROM bike_stock WHERE status='booked' AND sale_id IS NOT NULL)");
+} catch (PDOException $e) {}
 
 // Add unique indexes (skip if duplicates exist)
 $idxAdd = function($table, $index, $column) use ($pdo, $dbname) {

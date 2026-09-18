@@ -62,7 +62,20 @@ if ($stockItems):
                 <?php if ($s['status'] == 'ordered'): ?>
                     <button type="button" class="btn btn-sm btn-success" onclick="openReceiveModal(<?php echo $s['id']; ?>, '<?php echo e(addslashes($s['bname'] . ' ' . $s['mname'] . ' ' . $s['vname'] . ($s['color'] ? ' [' . $s['color'] . ']' : ''))); ?>')"><i class="bi bi-box-seam"></i> Receive</button>
                 <?php else: ?>
-                    <span class="text-muted small">--</span>
+                    <?php if (in_array($s['status'], ['in_stock', 'sold', 'booked'])): ?>
+                    <button type="button" class="btn btn-sm btn-outline-primary" title="Edit Serials"
+                        onclick="openEditStockModal(this)"
+                        data-id="<?php echo $s['id']; ?>"
+                        data-name="<?php echo e($s['bname'] . ' ' . $s['mname'] . ' ' . $s['vname'] . ($s['color'] ? ' [' . $s['color'] . ']' : '')); ?>"
+                        data-chassis="<?php echo e($s['chassis_no']); ?>"
+                        data-motor="<?php echo e($s['motor_no']); ?>"
+                        data-battery="<?php echo e($s['battery_serial']); ?>"
+                        data-charger="<?php echo e($s['charger_serial']); ?>"><i class="bi bi-pencil"></i></button>
+                    <?php endif; ?>
+                    <?php if (in_array($s['status'], ['in_stock', 'sold', 'booked', 'damaged'])): ?>
+                    <a href="purchase_view.php?delete_stock=<?php echo $s['id']; ?>" class="btn btn-sm btn-outline-danger" title="Delete Bike"
+                       onclick="return confirm('<?php echo in_array($s['status'], ['sold','booked']) ? 'This bike is part of a sale. Deleting will remove it from that sale and update the sale amount. Continue?' : 'Delete this bike from this purchase? This cannot be undone.'; ?>')"><i class="bi bi-trash"></i></a>
+                    <?php endif; ?>
                 <?php endif; ?>
             </td>
         </tr>

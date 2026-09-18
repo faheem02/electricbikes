@@ -76,6 +76,7 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    min-width: 0;
     transition: margin-left 0.3s;
 }
 .topbar {
@@ -92,7 +93,7 @@ body {
 }
 .topbar .page-title { font-size: 16px; font-weight: 600; }
 .topbar .user-info { font-size: 13px; display: flex; align-items: center; gap: 12px; }
-.main-content { flex: 1; padding: 22px; }
+.main-content { flex: 1; padding: 22px; min-width: 0; }
 .footer {
     background: var(--bg-card);
     padding: 10px 25px;
@@ -157,4 +158,16 @@ body {
         z-index: 999;
     }
     .overlay.show { display: block; }
+    .main-content { padding: 12px; }
+    .topbar { padding: 10px 14px; }
+    .topbar .user-info .user-name { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .card-header { padding: 12px 14px; flex-wrap: wrap; gap: 8px; }
+}
+
+@media (max-width: 576px) {
+    .dataTables_wrapper .row:first-child > div { text-align: left !important; margin-bottom: 8px; }
+    .dataTables_wrapper .dataTables_filter input { width: 100%; margin-left: 0 !important; }
+    .modal-dialog { margin: 0.5rem; }
+    .card-header .d-flex,
+    .card-header form { flex-wrap: wrap; }
 }

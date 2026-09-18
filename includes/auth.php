@@ -97,4 +97,47 @@ function nextInvoiceNo($pdo, $prefix, $table = 'sales', $col = 'invoice_no') {
     }
     return $cand;
 }
+
+// Recalculate sale totals from its items and rebuild auto ledger entries
+if (!function_exists('rebuildSaleLedger')) {
+    function rebuildSaleLedger($pdo, $sid) {
+        $st = $pdo->prepare("SELECT * FROM sales WHERE id=?");
+        $st->execute([$sid]);
+        $sale = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$sale) return;
+
+        $t = $pdo->prepare("SELECT COALESCE(SUM(sale_price),0) FROM sale_items WHERE sale_id=?");
+        $t->execute([$sid]);
+        $total = floatval($t->fetchColumn());
+
+        $c = $pdo->prepare("SELECT COALESCE(SUM(credit-debit),0) FROM customer_ledger WHERE customer_id=? AND description LIKE ?");
+        $c->execute([$sale['customer_id'], "%(INV: {$sale['invoice_no']})%"]);
+        $collected = floatval($c->fetchColumn());
+
+        $remaining = max(0, $total - $sale['discount'] - $sale['down_payment'] - $collected);
+        $payStatus = ($remaining <= 0) ? 'paid' : (($sale['down_payment'] > 0 || $collected > 0) ? 'partial' : 'unpaid');
+        $pdo->prepare("UPDATE sales SET total_amount=?, remaining_amount=?, payment_status=? WHERE id=?")
+            ->execute([$total, $remaining, $payStatus, $sid]);
+
+        $del = $pdo->prepare("DELETE FROM customer_ledger WHERE sale_id=?");
+        $del->execute([$sid]);
+        if ($del->rowCount() == 0) {
+            $d = $sale['invoice_no'];
+            $pdo->prepare("DELETE FROM customer_ledger WHERE customer_id=? AND (description=? OR description LIKE ? OR description=? OR description LIKE ?)")
+                ->execute([$sale['customer_id'], "Sale INV $d", "Sale INV $d %", "Payment INV $d", "Payment INV $d %"]);
+        }
+
+        $bn = $pdo->prepare("SELECT CONCAT(b.name,' ',m.name,' ',v.name,' (',s.chassis_no,')') FROM sale_items si JOIN bike_stock s ON si.stock_id=s.id JOIN bike_variants v ON s.variant_id=v.id JOIN bike_models m ON v.model_id=m.id JOIN bike_brands b ON m.brand_id=b.id WHERE si.sale_id=?");
+        $bn->execute([$sid]);
+        $names = $bn->fetchAll(PDO::FETCH_COLUMN);
+        $bikeDetail = !empty($names) ? ' - ' . implode(', ', $names) : '';
+
+        $pdo->prepare("INSERT INTO customer_ledger (customer_id, sale_id, date, description, debit, credit, balance) VALUES (?,?,?,?,?,0,0)")
+            ->execute([$sale['customer_id'], $sid, $sale['sale_date'], "Sale INV {$sale['invoice_no']}$bikeDetail", $total]);
+        if ($sale['down_payment'] > 0) {
+            $pdo->prepare("INSERT INTO customer_ledger (customer_id, sale_id, date, description, debit, credit, balance) VALUES (?,?,?,?,0,?,0)")
+                ->execute([$sale['customer_id'], $sid, $sale['sale_date'], "Payment INV {$sale['invoice_no']}$bikeDetail", $sale['down_payment']]);
+        }
+    }
+}
 ?>
