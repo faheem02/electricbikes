@@ -245,19 +245,12 @@ if (isset($_GET['print_order'])) {
         @page { size: A4; margin: 0; }
         .inv { max-width:700px; margin:auto; background:#fff; box-shadow:0 2px 12px rgba(0,0,0,.12); }
         .inv-inner { padding:15px 20px; }
-        .brand { text-align:center; }
-        .brand img { width:55px;height:55px;border-radius:50%;object-fit:cover;margin-bottom:5px;border:2px solid #095D3B; }
-        .brand h1 { color:#095D3B; font-size:22px; font-weight:700; letter-spacing:1px; margin:0; }
-        .brand .tagline { color:#095D3B; font-weight:600; font-size:9px; letter-spacing:3px; text-transform:uppercase; margin-top:2px; }
-        .brand .meta { color:#666; font-size:9px; margin-top:4px; line-height:1.4; }
-        .brand .meta .meta-line { margin:1px 0; }
-        .brand .meta .meta-line i { color:#095D3B; margin-right:4px; width:12px; text-align:center; }
-        .title-row { border-bottom:2px solid #095D3B; margin-top:8px; padding-bottom:4px; text-align:center; }
-        .title-row h2 { color:#095D3B; font-size:14px; font-weight:700; letter-spacing:4px; margin:0; text-transform:uppercase; }
+        .title-row { border-bottom:2px solid #00AEEF; margin-top:4px; padding-bottom:4px; text-align:center; }
+        .title-row h2 { color:#102E68; font-size:14px; font-weight:700; letter-spacing:3px; margin:0; text-transform:uppercase; }
         .inv-meta { display:flex; justify-content:space-between; font-size:10px; margin-top:6px; color:#333; }
-        .inv-meta b { font-weight:600; color:#095D3B; }
+        .inv-meta b { font-weight:600; color:#102E68; }
         .sec { margin-top:8px; }
-        .sec-bar { background:#095D3B; color:#fff; padding:3px 8px; font-size:9px; font-weight:600; letter-spacing:1px; text-transform:uppercase; }
+        .sec-bar { background:#102E68; color:#fff; padding:3px 8px; font-size:9px; font-weight:600; letter-spacing:1px; text-transform:uppercase; }
         .sec-body { border:1px solid #e4e4e4; border-top:none; padding:6px 8px; }
         .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:3px 14px; }
         .grid2 .f span { color:#888; font-size:8px; text-transform:uppercase; letter-spacing:.4px; display:block; }
@@ -265,39 +258,29 @@ if (isset($_GET['print_order'])) {
         .full { grid-column:1 / -1; }
         table.items { width:100%; border-collapse:collapse; }
         table.items th, table.items td { padding:3px 5px; font-size:9px; text-align:left; border-bottom:1px solid #eee; }
-        table.items th { background:#095D3B; color:#fff; font-weight:600; font-size:8px; text-transform:uppercase; letter-spacing:.3px; }
-        .bike-name { font-weight:600; color:#095D3B; }
+        table.items th { background:#102E68; color:#fff; font-weight:600; font-size:8px; text-transform:uppercase; letter-spacing:.3px; }
+        .bike-name { font-weight:600; color:#102E68; }
         .text-end { text-align:right; }
         .sum .row { display:flex; justify-content:space-between; align-items:center; padding:2px 0; font-size:10px; color:#333; }
         .sum .row span:first-child { color:#666; }
-        .sum .net { border-top:2px solid #095D3B; font-weight:700; font-size:11px; margin-top:2px; padding-top:4px; }
-        .sum .net span:first-child { color:#095D3B; }
+        .sum .net { border-top:2px solid #00AEEF; font-weight:700; font-size:11px; margin-top:2px; padding-top:4px; }
+        .sum .net span:first-child { color:#102E68; }
         .sum .paid { color:#1d8a4e; font-weight:700; }
         .sum .due { color:#d62839; font-weight:700; }
-        .pay-badge { display:inline-block; background:#e8f3ee; color:#095D3B; padding:1px 6px; border-radius:8px; font-size:8px; font-weight:600; text-transform:uppercase; }
+        .pay-badge { display:inline-block; background:#e8f3ee; color:#102E68; padding:1px 6px; border-radius:8px; font-size:8px; font-weight:600; text-transform:uppercase; }
         .notes { font-size:8px; color:#444; line-height:1.4; white-space:pre-line; }
-        .notes b { color:#095D3B; }
-        .foot { background:#095D3B; color:#fff; text-align:center; padding:6px; font-size:9px; font-weight:600; letter-spacing:.5px; }
+        .notes b { color:#102E68; }
+        .foot { background:#102E68; color:#fff; text-align:center; padding:6px; font-size:9px; font-weight:600; letter-spacing:.5px; }
         .no-print { text-align:center; margin-top:12px; }
         .no-print button, .no-print a { display:inline-block; padding:8px 20px; margin:0 5px; border-radius:4px; text-decoration:none; font-size:13px; cursor:pointer; border:none; }
-        .btn-primary { background:#095D3B; color:#fff; }
+        .btn-primary { background:#102E68; color:#fff; }
         .btn-secondary { background:#6c757d; color:#fff; }
         @media print { body { padding:0; background:#fff; } .inv { box-shadow:none; max-width:100%; } .no-print { display:none; } }
     </style>
     </head><body>
     <div class="inv">
         <div class="inv-inner">
-            <div class="brand">
-                <img src="../pic/alhafiz.jpeg" alt="Logo">
-                <h1><?php echo COMPANY_NAME; ?></h1>
-                <div class="tagline">EV Scooties &amp; Electric Motorcycles</div>
-                <div class="meta">
-                    <div class="meta-line"><i class="fas fa-map-marker-alt"></i> <?php echo COMPANY_ADDRESS; ?></div>
-                    <div class="meta-line"><?php echo COMPANY_TAGLINE; ?> | <?php echo COMPANY_LINE3; ?></div>
-                    <div class="meta-line"><i class="fab fa-whatsapp"></i> <?php echo COMPANY_PHONES; ?></div>
-                    <div class="meta-line"><i class="fas fa-envelope"></i> <?php echo COMPANY_EMAIL; ?></div>
-                </div>
-            </div>
+            <?php $pt = ''; include '../includes/print_header.php'; ?>
             <div class="title-row"><h2>Purchase Order</h2></div>
             <div class="inv-meta">
                 <div><b>Invoice No:</b> <?php echo e($po['invoice_no']); ?></div>

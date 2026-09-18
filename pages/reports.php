@@ -204,15 +204,10 @@ if (isset($_GET['print'])) {
         * { font-family:'Poppins',sans-serif; margin:0; padding:0; box-sizing:border-box; }
         body { background:#fff; color:#222; }
         .print-box { width:100%; }
-        .header { text-align:center; border-bottom:2px solid #095D3B; padding-bottom:10px; margin-bottom:10px; }
-        .header h1 { color:#095D3B; font-size:18px; margin:0; }
-        .header .meta-line { margin:2px 0; font-size:10px; color:#555; }
-        .header .meta-line i { color:#095D3B; margin-right:4px; width:12px; text-align:center; }
-        .report-title { text-align:center; font-size:13px; font-weight:700; color:#333; margin:8px 0 3px; }
-        .date-range { text-align:center; font-size:10px; color:#777; margin-bottom:10px; }
+        .date-range { text-align:center; font-size:10.5px; color:#555; margin-bottom:10px; }
         table { width:100%; border-collapse:collapse; font-size:9.5px; margin-bottom:12px; }
         th, td { padding:5px 6px; text-align:left; border-bottom:1px solid #e0e0e0; }
-        th { background:#095D3B; color:#fff; font-weight:600; font-size:9px; text-transform:uppercase; }
+        th { background:#102E68; color:#fff; font-weight:600; font-size:9px; text-transform:uppercase; }
         .text-end { text-align:right; }
         .text-center { text-align:center; }
         .fw-bold { font-weight:700; }
@@ -231,12 +226,12 @@ if (isset($_GET['print'])) {
 
         .summary-box { width:65%; margin-left:auto; border:1px solid #ccc; border-radius:4px; padding:8px; margin-top:10px; font-size:10px; }
         .summary-row { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px dashed #eee; }
-        .summary-row.total { border-top:2px solid #095D3B; border-bottom:none; font-weight:700; font-size:11px; padding-top:5px; margin-top:4px; }
+        .summary-row.total { border-top:2px solid #102E68; border-bottom:none; font-weight:700; font-size:11px; padding-top:5px; margin-top:4px; }
 
         .footer { text-align:center; margin-top:15px; color:#888; font-size:9px; border-top:1px solid #eee; padding-top:8px; }
         .no-print { text-align:center; margin-top:15px; }
         .no-print button { display:inline-block; padding:7px 18px; margin:0 4px; border-radius:4px; font-size:12px; cursor:pointer; border:none; }
-        .btn-primary { background:#095D3B; color:#fff; }
+        .btn-primary { background:#102E68; color:#fff; }
         .btn-secondary { background:#6c757d; color:#fff; }
         @media print { body { padding:0; background:#fff; } .print-box { box-shadow:none; } .no-print { display:none; } }
     </style></head><body>

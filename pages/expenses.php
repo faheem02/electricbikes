@@ -40,7 +40,7 @@ if (isset($_GET['print'])) {
         .info .label { color:#888; font-size:12px; text-transform:uppercase; letter-spacing:0.3px; }
         table { width:100%; border-collapse:collapse; font-size:13px; }
         th, td { padding:7px 10px; text-align:left; border-bottom:1px solid #ddd; }
-        th { background:#095D3B; color:#fff; font-weight:600; font-size:11px; text-transform:uppercase; }
+        th { background:#102E68; color:#fff; font-weight:600; font-size:11px; text-transform:uppercase; }
         .text-end { text-align:right; }
         .fw-bold { font-weight:700; }
         .text-muted { color:#888; }
@@ -49,7 +49,7 @@ if (isset($_GET['print'])) {
         .footer { text-align:center; margin-top:30px; color:#888; font-size:13px; border-top:1px solid #eee; padding-top:20px; }
         .no-print { text-align:center; margin-top:20px; }
         .no-print button { display:inline-block; padding:10px 24px; margin:0 5px; border-radius:4px; font-size:14px; cursor:pointer; border:none; }
-        .btn-primary { background:#095D3B; color:#fff; }
+        .btn-primary { background:#102E68; color:#fff; }
         .btn-secondary { background:#6c757d; color:#fff; }
         @media print { body { padding:20px; background:#fff; } .print-box { box-shadow:none; padding:20px; } .no-print { display:none; } }
     </style></head><body>

@@ -42,25 +42,20 @@ if (isset($_GET['print'])) {
         @page { size: A4 portrait; margin: 12mm; }
         * { font-family:'Poppins',sans-serif; margin:0; padding:0; box-sizing:border-box; }
         body { background:#fff; }
-        .print-box { width:100%; }
-        .header { text-align:center; border-bottom:2px solid #095D3B; padding-bottom:12px; margin-bottom:12px; }
-        .header h1 { color:#095D3B; font-size:20px; margin:0; }
-        .header .meta-line { margin:2px 0; font-size:11px; color:#666; }
-        .header .meta-line i { color:#095D3B; margin-right:4px; width:12px; text-align:center; }
         .info { text-align:right; margin-bottom:10px; font-size:11px; color:#555; }
         table { width:100%; border-collapse:collapse; font-size:10px; margin-bottom:12px; }
         th, td { padding:4px 6px; text-align:left; border-bottom:1px solid #ddd; }
-        th { background:#095D3B; color:#fff; font-weight:600; font-size:9px; text-transform:uppercase; }
+        th { background:#102E68; color:#fff; font-weight:600; font-size:9px; text-transform:uppercase; }
         .text-center { text-align:center; }
         .fw-bold { font-weight:700; }
-        .brand-row td { background:#e8f3ee; font-weight:700; font-size:11px; color:#095D3B; }
+        .brand-row td { background:#e8f3ee; font-weight:700; font-size:11px; color:#102E68; }
         .model-row td { background:#f5f5f5; font-weight:600; font-size:10px; }
         .total-row td { background:#f0f0f0; font-weight:600; }
-        .grand-row td { background:#095D3B; color:#fff; font-weight:700; font-size:11px; }
+        .grand-row td { background:#102E68; color:#fff; font-weight:700; font-size:11px; }
         .footer { text-align:center; margin-top:15px; color:#888; font-size:10px; border-top:1px solid #eee; padding-top:10px; }
         .no-print { text-align:center; margin-top:15px; }
         .no-print button { display:inline-block; padding:8px 20px; margin:0 5px; border-radius:4px; font-size:13px; cursor:pointer; border:none; }
-        .btn-primary { background:#095D3B; color:#fff; }
+        .btn-primary { background:#102E68; color:#fff; }
         .btn-secondary { background:#6c757d; color:#fff; }
         @media print { body { padding:0; background:#fff; } .print-box { box-shadow:none; } .no-print { display:none; } }
     </style></head><body>
